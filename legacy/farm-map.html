@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Карта на фермата</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#0a1e29;
+    --bg-panel:#11324399;
+    --bg-panel-solid:#123243;
+    --panel-border:#22516a;
+    --text-primary:#eaf4f2;
+    --text-muted:#93b3bf;
+    --accent-line:#4fd1c5;
+    --accent-buoy:#ff8a3d;
+    --accent-warn:#ffcf5c;
+    --accent-danger:#ff5c5c;
+    --accent-good:#52e0a1;
+    --size-spat:#bfe6a8;
+    --size-small:#6ec6ff;
+    --size-large:#ffb84d;
+    --size-xl:#ff6f59;
+    --size-commercial:#f4d35e;
+    --radius:10px;
+    --shadow: 0 6px 24px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    height:100%; margin:0; padding:0;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    font-family:'Space Grotesk', system-ui, sans-serif;
+    overflow:hidden;
+  }
+  #app{position:relative; width:100%; height:100vh;}
+  #map{position:absolute; inset:0; background:#0a1e29;}
+  .leaflet-container{background:#0a1e29;}
+
+  /* ---------- Top bar ---------- */
+  #topbar{
+    position:absolute; top:0; left:0; right:0; z-index:1000;
+    display:flex; align-items:center; gap:14px;
+    padding:10px 16px;
+    background:linear-gradient(180deg, rgba(10,30,41,.92), rgba(10,30,41,.0));
+    pointer-events:none;
+  }
+  #topbar > *{pointer-events:auto;}
+  .brand{display:flex; flex-direction:column; line-height:1.1;}
+  .brand .title{font-weight:700; font-size:16px; letter-spacing:.2px;}
+  .brand .subtitle{font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--text-muted);}
+  .spacer{flex:1;}
+  .stat-chip{
+    font-family:'JetBrains Mono', monospace; font-size:11px;
+    background:var(--bg-panel); border:1px solid var(--panel-border);
+    padding:5px 10px; border-radius:20px; color:var(--text-muted);
+    backdrop-filter: blur(6px);
+  }
+  .stat-chip b{color:var(--text-primary); font-weight:600;}
+  button.btn{
+    font-family:'Space Grotesk', sans-serif; font-size:12px; font-weight:600;
+    background:var(--bg-panel-solid); color:var(--text-primary);
+    border:1px solid var(--panel-border); padding:8px 14px; border-radius:8px;
+    cursor:pointer; transition:.15s ease;
+  }
+  button.btn:hover{border-color:var(--accent-line); color:var(--accent-line);}
+  button.btn.active{background:var(--accent-line); color:#062226; border-color:var(--accent-line);}
+  button.btn.warn{border-color:var(--accent-warn); color:var(--accent-warn);}
+  button.btn.danger{border-color:var(--accent-danger); color:var(--accent-danger);}
+  button.btn.small{padding:5px 9px; font-size:11px;}
+
+  /* ---------- Info / geometry banner ---------- */
+  #geo-banner{
+    position:absolute; top:58px; left:16px; z-index:999;
+    max-width:340px;
+    background:var(--bg-panel); border:1px solid var(--accent-warn);
+    border-radius:var(--radius); padding:10px 12px; font-size:11.5px;
+    color:var(--text-muted); backdrop-filter: blur(6px); box-shadow:var(--shadow);
+    display:none;
+  }
+  #geo-banner.show{display:block;}
+  #geo-banner b{color:var(--accent-warn); display:block; margin-bottom:3px; font-size:12px;}
+  #geo-banner .close-mini{float:right; cursor:pointer; color:var(--text-muted); font-family:monospace;}
+
+  /* ---------- Legend ---------- */
+  #legend{
+    position:absolute; bottom:16px; left:16px; z-index:999;
+    background:var(--bg-panel); border:1px solid var(--panel-border);
+    border-radius:var(--radius); padding:10px 12px; font-size:11px;
+    color:var(--text-muted); backdrop-filter: blur(6px); box-shadow:var(--shadow);
+    width:210px;
+  }
+  #legend .lg-title{font-weight:700; color:var(--text-primary); font-size:11px; margin-bottom:6px; letter-spacing:.4px; text-transform:uppercase;}
+  #legend .row{display:flex; align-items:center; gap:7px; margin:3px 0;}
+  #legend .sw{width:11px; height:11px; border-radius:3px; flex:none; border:1px solid rgba(0,0,0,.4);}
+  #legend .sw.circle{border-radius:50%;}
+  #legend .sw.tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid #a67c52; background:none; border-top:none;}
+  #legend hr{border:none; border-top:1px solid var(--panel-border); margin:7px 0;}
+
+  /* ---------- Compass ---------- */
+  .compass-control{
+    background:var(--bg-panel); border:1px solid var(--panel-border);
+    border-radius:50%; width:54px; height:54px; backdrop-filter: blur(6px);
+    box-shadow:var(--shadow); position:relative;
+  }
+  .compass-rose{position:relative; width:100%; height:100%;}
+  .compass-rose span{position:absolute; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:var(--text-primary);}
+  .compass-rose .n{top:3px; left:50%; transform:translateX(-50%); color:var(--accent-danger);}
+  .compass-rose .s{bottom:3px; left:50%; transform:translateX(-50%);}
+  .compass-rose .e{right:4px; top:50%; transform:translateY(-50%);}
+  .compass-rose .w{left:4px; top:50%; transform:translateY(-50%);}
+  .compass-rose .dot{position:absolute; top:50%; left:50%; width:5px; height:5px; margin:-2.5px; border-radius:50%; background:var(--accent-line);}
+
+  /* ---------- Side panels ---------- */
+  .panel{
+    position:absolute; top:0; right:0; height:100%; width:340px; max-width:88vw;
+    background:var(--bg-panel-solid); border-left:1px solid var(--panel-border);
+    box-shadow:-8px 0 24px rgba(0,0,0,.5); z-index:1100;
+    transform:translateX(100%); transition:transform .25s ease;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .panel.open{transform:translateX(0);}
+  .panel-head{
+    padding:16px; border-bottom:1px solid var(--panel-border);
+    display:flex; align-items:flex-start; justify-content:space-between;
+  }
+  .panel-head .ph-title{font-size:15px; font-weight:700;}
+  .panel-head .ph-sub{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted); margin-top:3px;}
+  .panel-close{cursor:pointer; background:none; border:none; color:var(--text-muted); font-size:18px; line-height:1;}
+  .panel-close:hover{color:var(--accent-danger);}
+  .panel-body{padding:16px; overflow-y:auto; flex:1;}
+  .field{margin-bottom:12px;}
+  .field label{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-muted); margin-bottom:4px;}
+  .field .val{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-primary);}
+  .field select, .field input{
+    width:100%; background:#0d2733; border:1px solid var(--panel-border); color:var(--text-primary);
+    padding:7px 8px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:12px;
+  }
+  .badge{display:inline-block; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:700; font-family:'JetBrains Mono',monospace;}
+  .badge.active{background:var(--accent-good); color:#04211a;}
+  .badge.lost{background:var(--accent-danger); color:#2a0505;}
+  .badge.onland{background:#a67c52; color:#2a1a08;}
+  .badge.archived{background:#7a8a93; color:#0e1a1f;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .panel-foot{padding:14px 16px; border-top:1px solid var(--panel-border); display:flex; gap:8px;}
+  .panel-foot .btn{flex:1;}
+
+  /* ---------- Admin panel ---------- */
+  #admin-panel .panel-body{font-size:12px;}
+  .admin-line-card{
+    background:#0d2733; border:1px solid var(--panel-border); border-radius:8px;
+    padding:10px; margin-bottom:10px;
+  }
+  .admin-line-card .alc-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .admin-line-card .alc-head .num{font-weight:700; font-size:13px;}
+  .admin-line-card .alc-warn{color:var(--accent-warn); font-size:10.5px; margin-top:6px; font-family:'JetBrains Mono',monospace;}
+  .mini-label{font-size:9.5px; color:var(--text-muted); text-transform:uppercase; margin-bottom:2px; display:block;}
+  details.gap-editor summary{cursor:pointer; color:var(--accent-line); font-size:11px; margin:8px 0;}
+  .gap-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:5px; margin-top:6px;}
+  .gap-grid input{padding:4px; font-size:10px; text-align:center;}
+  #geom-check-result{margin-top:10px; font-family:'JetBrains Mono',monospace; font-size:11px; padding:8px; border-radius:6px; background:#0d2733; border:1px solid var(--panel-border);}
+
+  /* ---------- Modal (full dossier) ---------- */
+  #modal-overlay{
+    position:absolute; inset:0; background:rgba(4,14,20,.72); z-index:1400;
+    display:none; align-items:center; justify-content:center; backdrop-filter: blur(2px);
+  }
+  #modal-overlay.show{display:flex;}
+  #modal-box{
+    width:380px; max-width:90vw; max-height:85vh; overflow-y:auto;
+    background:var(--bg-panel-solid); border:1px solid var(--panel-border);
+    border-radius:14px; box-shadow:var(--shadow); padding:20px;
+  }
+  #modal-box .mb-title{font-size:18px; font-weight:700; margin-bottom:2px;}
+  #modal-box .mb-id{font-family:'JetBrains Mono',monospace; color:var(--accent-line); font-size:13px; margin-bottom:14px;}
+  #qr-holder{background:#fff; padding:10px; border-radius:8px; display:inline-block; margin:10px 0;}
+  #qr-fallback{font-family:'JetBrains Mono',monospace; font-size:11px; color:#0a1e29; text-align:center; padding:20px; width:120px;}
+
+  /* ---------- Map icon styling (injected via Leaflet divIcon) ---------- */
+  .anchor-icon{font-size:15px; color:var(--accent-line); filter:drop-shadow(0 0 3px #000);}
+  .line-label{
+    background:rgba(17,50,67,.88); border:1px solid var(--panel-border); color:var(--text-primary);
+    font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:600;
+    padding:3px 8px; border-radius:5px; white-space:nowrap; box-shadow:var(--shadow);
+  }
+  .buoy-dot{
+    width:20px; height:20px; border-radius:50%; background:#173947; border:2px solid var(--accent-buoy);
+    color:var(--text-primary); font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 0 5px rgba(0,0,0,.55);
+  }
+  .satka-shape{
+    width:14px; height:14px; border:1.5px solid rgba(0,0,0,.4); box-shadow:0 0 3px rgba(0,0,0,.55);
+    display:flex; align-items:center; justify-content:center; font-size:9px; color:#0a1e29; font-weight:800;
+  }
+  .sat-square .satka-shape{border-radius:3px;}
+  .sat-lost .satka-shape{border-radius:50%; background:var(--accent-danger) !important; color:#fff;}
+  .sat-onland .satka-shape{clip-path:polygon(50% 0%,0% 100%,100% 100%); background:#a67c52 !important; border:none;}
+  .sat-archived .satka-shape{opacity:.4; filter:grayscale(.6); border-style:dashed;}
+
+  #storage-warning{
+    position:absolute; bottom:16px; right:16px; z-index:999; max-width:280px;
+    background:#3a1414cc; border:1px solid var(--accent-danger); border-radius:8px;
+    padding:8px 10px; font-size:11px; color:#ffdada; display:none;
+  }
+  #storage-warning.show{display:block;}
+
+  @media (max-width:640px){
+    .panel{width:92vw;}
+    #legend{width:170px; font-size:10px;}
+    .brand .title{font-size:13px;}
+    #geo-banner{max-width:78vw;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+
+  <div id="topbar">
+    <div class="brand">
+      <div class="title">⚓ Карта на фермата</div>
+      <div class="subtitle" id="center-coords">43.3253309, 28.0747198</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="stat-chip" id="stat-chip">зареждане…</div>
+    <button class="btn" id="toggle-seamark">🌊 Морски знаци</button>
+    <button class="btn" id="toggle-admin">⚙ Админ режим</button>
+  </div>
+
+  <div id="geo-banner">
+    <span class="close-mini" id="geo-banner-close">✕</span>
+    <b>Геометрична проверка</b>
+    <div id="geo-banner-text"></div>
+  </div>
+
+  <div id="legend">
+    <div class="lg-title">Легенда</div>
+    <div class="row"><div class="sw" style="background:var(--size-spat)"></div>Спат</div>
+    <div class="row"><div class="sw" style="background:var(--size-small)"></div>Малки</div>
+    <div class="row"><div class="sw" style="background:var(--size-large)"></div>Големи</div>
+    <div class="row"><div class="sw" style="background:var(--size-xl)"></div>Едри</div>
+    <div class="row"><div class="sw" style="background:var(--size-commercial)"></div>Търговски размер</div>
+    <hr>
+    <div class="row"><div class="sw circle" style="background:var(--accent-danger)"></div>Изгубена</div>
+    <div class="row"><div class="sw tri"></div>На суша</div>
+    <div class="row"><div class="sw" style="background:#7a8a93; opacity:.5; border-style:dashed;"></div>Изведена от употреба</div>
+    <hr>
+    <div class="row" style="color:var(--text-muted); font-size:10px;">Приближете за шамандури (Ш) и сатки</div>
+  </div>
+
+  <div id="storage-warning">⚠ Промените не могат да бъдат запазени в момента (паметта е недостъпна). Данните ще се изгубят при презареждане.</div>
+
+  <!-- Detail panel: buoy / satka -->
+  <div class="panel" id="detail-panel">
+    <div class="panel-head">
+      <div>
+        <div class="ph-title" id="dp-title">—</div>
+        <div class="ph-sub" id="dp-sub">—</div>
+      </div>
+      <button class="panel-close" id="dp-close">✕</button>
+    </div>
+    <div class="panel-body" id="dp-body"></div>
+    <div class="panel-foot" id="dp-foot"></div>
+  </div>
+
+  <!-- Admin panel -->
+  <div class="panel" id="admin-panel" style="width:400px;">
+    <div class="panel-head">
+      <div>
+        <div class="ph-title">⚙ Административен режим</div>
+        <div class="ph-sub">Физическа структура на фермата</div>
+      </div>
+      <button class="panel-close" id="admin-close">✕</button>
+    </div>
+    <div class="panel-body" id="admin-body"></div>
+    <div class="panel-foot">
+      <button class="btn" id="admin-add-line">+ Добави линия</button>
+      <button class="btn danger" id="admin-reset">Нулиране на данните</button>
+    </div>
+  </div>
+
+  <!-- Modal: full dossier -->
+  <div id="modal-overlay">
+    <div id="modal-box">
+      <div style="text-align:right;"><button class="panel-close" id="modal-close">✕</button></div>
+      <div class="mb-title" id="modal-title">—</div>
+      <div class="mb-id" id="modal-id">—</div>
+      <div id="modal-fields"></div>
+      <div style="text-align:center;" id="qr-holder"></div>
+      <div style="font-size:10.5px; color:var(--text-muted); margin-top:8px;">
+        QR кодът и идентификаторът са обвързани трайно с тази структурна позиция (линия · секция · позиция) и не се променят при преместване на линията.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onerror="window.__qrLibMissing=true"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   GEOMETRY HELPERS
+============================================================ */
+const R_EARTH = 6371000;
+const toRad = d => d*Math.PI/180;
+const toDeg = r => r*180/Math.PI;
+
+function destPoint(lat,lng,bearingDeg,distM){
+  const delta = distM/R_EARTH;
+  const theta = toRad(bearingDeg);
+  const phi1 = toRad(lat), lam1 = toRad(lng);
+  const phi2 = Math.asin(Math.sin(phi1)*Math.cos(delta) + Math.cos(phi1)*Math.sin(delta)*Math.cos(theta));
+  const lam2 = lam1 + Math.atan2(
+    Math.sin(theta)*Math.sin(delta)*Math.cos(phi1),
+    Math.cos(delta) - Math.sin(phi1)*Math.sin(phi2)
+  );
+  return {lat: toDeg(phi2), lng: toDeg(lam2)};
+}
+function haversine(lat1,lng1,lat2,lng2){
+  const phi1=toRad(lat1), phi2=toRad(lat2);
+  const dphi=toRad(lat2-lat1), dlam=toRad(lng2-lng1);
+  const a = Math.sin(dphi/2)**2 + Math.cos(phi1)*Math.cos(phi2)*Math.sin(dlam/2)**2;
+  return 2*R_EARTH*Math.asin(Math.sqrt(a));
+}
+function bearingBetween(lat1,lng1,lat2,lng2){
+  const phi1=toRad(lat1), phi2=toRad(lat2), dlam=toRad(lng2-lng1);
+  const y = Math.sin(dlam)*Math.cos(phi2);
+  const x = Math.cos(phi1)*Math.sin(phi2) - Math.sin(phi1)*Math.cos(phi2)*Math.cos(dlam);
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+
+/* ============================================================
+   FARM CONSTANTS
+============================================================ */
+const FARM_CENTER = {lat:43.3253309, lng:28.0747198};
+const GAP_DISTANCES_DEFAULT = [4, ...Array(23).fill(6), 4]; // 25 gaps, 26 buoys
+const BUOY_COUNT = 26;
+const SECTION_COUNT = BUOY_COUNT - 1; // 25
+const POSITIONS = [
+  {code:1, key:'LG', label:'Лява горна',  perpSign:-1, alongFrac:0.25},
+  {code:2, key:'DG', label:'Дясна горна', perpSign: 1, alongFrac:0.25},
+  {code:3, key:'LD', label:'Лява долна',  perpSign:-1, alongFrac:0.75},
+  {code:4, key:'DD', label:'Дясна долна', perpSign: 1, alongFrac:0.75},
+];
+const CAGE_PERP_OFFSET = 1.3; // meters, visual spread of the 2x2 cage grid off the line axis
+
+const SIZES = ['Спат','Малки','Големи','Едри','Търговски размер'];
+const SIZE_COLORS = {
+  'Спат':'var(--size-spat)', 'Малки':'var(--size-small)', 'Големи':'var(--size-large)',
+  'Едри':'var(--size-xl)', 'Търговски размер':'var(--size-commercial)'
+};
+const SIZE_COLORS_HEX = {
+  'Спат':'#bfe6a8', 'Малки':'#6ec6ff', 'Големи':'#ffb84d', 'Едри':'#ff6f59', 'Търговски размер':'#f4d35e'
+};
+const STATUSES = ['Активна','Изгубена','На суша','Изведена от употреба'];
+
+function generateSatkaId(lineId, sectionIndex, posCode){
+  return `SAT-1${lineId}${String(sectionIndex).padStart(2,'0')}${posCode}`;
+}
+
+/* ============================================================
+   DEFAULT FARM GEOMETRY (placeholder — replace with real GPS
+   per line via Admin mode once surveyed)
+
+   Layout follows the sketch supplied by the user: the 6 lines run
+   parallel to the coast (roughly N–S) and sit out to sea from it.
+   They form two separate clusters of 3 parallel lines stacked
+   along the coast — one cluster to the north, one to the south —
+   rather than one continuous row of 6. Within each cluster the 3
+   lines sit side by side, spaced apart perpendicular to their own
+   run direction (i.e. further/closer to shore).
+   Heading 0° (due north) is a placeholder for "parallel to the
+   coast" until real GPS/heading data is entered in Admin mode.
+============================================================ */
+function generateDefaultLines(center){
+  const heading = 0; // degrees — PLACEHOLDER "parallel to coast" orientation, edit in admin
+  const perp = (heading+90)%360; // out to sea
+  const withinGroupSpacing = 18; // m, spacing between the 3 lines inside a cluster
+  const groupAlongGap = 40; // m, clear water channel between the two clusters along the coast
+  const lineLen = GAP_DISTANCES_DEFAULT.reduce((a,b)=>a+b,0); // 146
+  const halfLen = lineLen/2;
+  const groupCenterOffset = halfLen + groupAlongGap/2; // distance of each cluster's center from farm center, along the coast
+
+  const lines = [];
+  // group A: northern cluster (lines 1-3) · group B: southern cluster (lines 4-6)
+  [{group:'A', sign:1, baseId:1}, {group:'B', sign:-1, baseId:4}].forEach(g=>{
+    const clusterCenter = destPoint(center.lat, center.lng, heading, g.sign*groupCenterOffset);
+    for(let i=0;i<3;i++){
+      const perpOffset = (i-1)*withinGroupSpacing; // -18, 0, +18 — centered on the cluster
+      const lineCenter = destPoint(clusterCenter.lat, clusterCenter.lng, perp, perpOffset);
+      const start = destPoint(lineCenter.lat, lineCenter.lng, heading, -halfLen);
+      const end = destPoint(lineCenter.lat, lineCenter.lng, heading, halfLen);
+      lines.push({ id: g.baseId+i, group: g.group, start, end });
+    }
+  });
+  return lines;
+}
+
+/* ============================================================
+   STATE + PERSISTENCE
+============================================================ */
+let farmState = null;
+let storageOK = true;
+const STORAGE_KEY = 'farm-state';
+
+async function loadState(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if(res && res.value){ farmState = JSON.parse(res.value); }
+  }catch(e){ /* not found yet — fall through to defaults */ }
+  if(!farmState){
+    farmState = {
+      center: FARM_CENTER,
+      lines: generateDefaultLines(FARM_CENTER),
+      gapDistances: GAP_DISTANCES_DEFAULT.slice(),
+      satki: {}
+    };
+    await saveState();
+  }
+  // backward-safety: ensure gapDistances length matches BUOY_COUNT-1
+  if(!farmState.gapDistances || farmState.gapDistances.length !== SECTION_COUNT){
+    farmState.gapDistances = GAP_DISTANCES_DEFAULT.slice();
+  }
+}
+async function saveState(){
+  try{
+    const r = await window.storage.set(STORAGE_KEY, JSON.stringify(farmState), true);
+    if(!r){ throw new Error('null result'); }
+    storageOK = true;
+    document.getElementById('storage-warning').classList.remove('show');
+  }catch(e){
+    storageOK = false;
+    document.getElementById('storage-warning').classList.add('show');
+  }
+}
+
+function getSatkaRecord(id){
+  return farmState.satki[id] || {size:'Малки', status:'Активна', lastProcessed:null, notes:''};
+}
+async function setSatkaRecord(id, rec){
+  farmState.satki[id] = rec;
+  await saveState();
+}
+
+/* ============================================================
+   DERIVED GEOMETRY
+============================================================ */
+function computeBuoys(line, gapDistances){
+  const heading = bearingBetween(line.start.lat,line.start.lng,line.end.lat,line.end.lng);
+  const buoys = [{index:1, pos:{...line.start}, cum:0}];
+  let cum = 0;
+  for(let g=0; g<gapDistances.length; g++){
+    cum += gapDistances[g];
+    buoys.push({index:g+2, pos: destPoint(line.start.lat,line.start.lng,heading,cum), cum});
+  }
+  return {buoys, heading};
+}
+function computeSatkiForSection(line, buoyA, buoyB, sectionIndex, heading){
+  const perp = (heading+90)%360;
+  const gapLen = buoyB.cum - buoyA.cum;
+  return POSITIONS.map(p=>{
+    const alongDist = buoyA.cum + gapLen*p.alongFrac;
+    const centerPt = destPoint(line.start.lat, line.start.lng, heading, alongDist);
+    const pt = destPoint(centerPt.lat, centerPt.lng, perp, p.perpSign*CAGE_PERP_OFFSET);
+    const id = generateSatkaId(line.id, sectionIndex, p.code);
+    return {id, lineId:line.id, section:sectionIndex, positionKey:p.key, positionLabel:p.label, pos:pt};
+  });
+}
+function lineActualLength(line){
+  return haversine(line.start.lat,line.start.lng,line.end.lat,line.end.lng);
+}
+function gapSum(gapDistances){
+  return gapDistances.reduce((a,b)=>a+b,0);
+}
+
+/* ============================================================
+   MAP INIT
+============================================================ */
+const map = L.map('map', {zoomControl:true, maxZoom:22, minZoom:5}).setView([FARM_CENTER.lat, FARM_CENTER.lng], 17);
+
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom:22, maxNativeZoom:19, attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+const seamarkLayer = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+  maxZoom:22, maxNativeZoom:18, attribution:'&copy; OpenSeaMap'
+});
+
+const linesLayer = L.layerGroup().addTo(map);
+const buoysLayer = L.layerGroup();
+const satkiLayer = L.layerGroup();
+
+// Compass control (N/S/E/W)
+L.Control.Compass = L.Control.extend({
+  options:{position:'topright'},
+  onAdd:function(){
+    const div = L.DomUtil.create('div','compass-control');
+    div.innerHTML = '<div class="compass-rose"><span class="n">N</span><span class="s">S</span><span class="e">E</span><span class="w">W</span><div class="dot"></div></div>';
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  }
+});
+map.addControl(new L.Control.Compass());
+map.zoomControl.setPosition('bottomright');
+
+/* ============================================================
+   RENDERING
+============================================================ */
+function fmtCoord(v){ return v.toFixed(6); }
+
+function renderLines(){
+  linesLayer.clearLayers();
+  const boundsPts = [];
+  farmState.lines.forEach(line=>{
+    const latlngs = [[line.start.lat,line.start.lng],[line.end.lat,line.end.lng]];
+    boundsPts.push(latlngs[0], latlngs[1]);
+
+    L.polyline(latlngs, {color:'#08222c', weight:8, opacity:.5, lineCap:'round'}).addTo(linesLayer);
+    L.polyline(latlngs, {color:'#4fd1c5', weight:3, dashArray:'2 7', opacity:.95, lineCap:'round'}).addTo(linesLayer);
+
+    const anchorIcon = L.divIcon({className:'', html:'<div class="anchor-icon">⚓</div>', iconSize:[16,16], iconAnchor:[8,8]});
+    L.marker(latlngs[0], {icon:anchorIcon, interactive:false}).addTo(linesLayer);
+    L.marker(latlngs[1], {icon:anchorIcon, interactive:false}).addTo(linesLayer);
+
+    const midLat=(line.start.lat+line.end.lat)/2, midLng=(line.start.lng+line.end.lng)/2;
+    const actual = lineActualLength(line);
+    const nominal = gapSum(farmState.gapDistances);
+    const mismatch = Math.abs(actual-nominal) > 0.5;
+    const label = L.divIcon({
+      className:'',
+      html:`<div class="line-label">Линия ${line.id} · Група ${line.group}${mismatch?' ⚠':''}</div>`,
+      iconSize:null
+    });
+    L.marker([midLat,midLng], {icon:label, interactive:false}).addTo(linesLayer);
+  });
+
+  if(boundsPts.length){
+    map.fitBounds(L.latLngBounds(boundsPts), {padding:[60,60]});
+  }
+}
+
+function buildSatkaIcon(rec){
+  const color = SIZE_COLORS_HEX[rec.size] || '#6ec6ff';
+  let shapeClass = 'sat-square';
+  let extra = '';
+  if(rec.status==='Изгубена'){ shapeClass='sat-lost'; extra='✕'; }
+  else if(rec.status==='На суша'){ shapeClass='sat-onland'; }
+  else if(rec.status==='Изведена от употреба'){ shapeClass='sat-archived'; }
+  return L.divIcon({
+    className:'satka-icon '+shapeClass,
+    html:`<div class="satka-shape" style="background:${color}">${extra}</div>`,
+    iconSize:[14,14], iconAnchor:[7,7]
+  });
+}
+
+let satkaMarkerIndex = {}; // id -> leaflet marker, for targeted icon refresh
+
+function renderBuoysAndSatki(){
+  buoysLayer.clearLayers();
+  satkiLayer.clearLayers();
+  satkaMarkerIndex = {};
+
+  farmState.lines.forEach(line=>{
+    const {buoys, heading} = computeBuoys(line, farmState.gapDistances);
+
+    buoys.forEach(b=>{
+      const icon = L.divIcon({className:'', html:`<div class="buoy-dot">Ш${b.index}</div>`, iconSize:[20,20], iconAnchor:[10,10]});
+      const m = L.marker([b.pos.lat,b.pos.lng], {icon}).addTo(buoysLayer);
+      m.on('click', ()=> showBuoyDetail(line, b, heading));
+    });
+
+    for(let s=1; s<=SECTION_COUNT; s++){
+      const bA = buoys[s-1], bB = buoys[s];
+      const satki = computeSatkiForSection(line, bA, bB, s, heading);
+      satki.forEach(sat=>{
+        const rec = getSatkaRecord(sat.id);
+        const icon = buildSatkaIcon(rec);
+        const mk = L.marker([sat.pos.lat, sat.pos.lng], {icon}).addTo(satkiLayer);
+        mk.on('click', ()=> showSatkaDetail(sat, getSatkaRecord(sat.id)));
+        satkaMarkerIndex[sat.id] = mk;
+      });
+    }
+  });
+}
+
+function refreshSatkaIcon(id){
+  const mk = satkaMarkerIndex[id];
+  if(mk){ mk.setIcon(buildSatkaIcon(getSatkaRecord(id))); }
+}
+
+function updateLayerVisibility(){
+  const z = map.getZoom();
+  if(z>=18){ if(!map.hasLayer(buoysLayer)) map.addLayer(buoysLayer); }
+  else{ if(map.hasLayer(buoysLayer)) map.removeLayer(buoysLayer); }
+  if(z>=20){ if(!map.hasLayer(satkiLayer)) map.addLayer(satkiLayer); }
+  else{ if(map.hasLayer(satkiLayer)) map.removeLayer(satkiLayer); }
+}
+map.on('zoomend', updateLayerVisibility);
+
+function renderAll(){
+  renderLines();
+  renderBuoysAndSatki();
+  updateLayerVisibility();
+  updateStatChip();
+  updateGeoBanner();
+}
+
+function updateStatChip(){
+  const totalBuoys = farmState.lines.length * BUOY_COUNT;
+  const totalSatki = farmState.lines.length * SECTION_COUNT * 4;
+  let lost=0, onland=0, archived=0;
+  Object.values(farmState.satki).forEach(r=>{
+    if(r.status==='Изгубена') lost++;
+    else if(r.status==='На суша') onland++;
+    else if(r.status==='Изведена от употреба') archived++;
+  });
+  document.getElementById('stat-chip').innerHTML =
+    `<b>${farmState.lines.length}</b> линии · <b>${totalBuoys}</b> шамандури · <b>${totalSatki}</b> позиции` +
+    (lost||onland||archived ? ` · <span style="color:var(--accent-warn)">${lost} изгубени / ${onland} на суша / ${archived} архивни</span>` : '');
+}
+
+function updateGeoBanner(){
+  const nominal = gapSum(farmState.gapDistances);
+  const banner = document.getElementById('geo-banner');
+  const text = document.getElementById('geo-banner-text');
+  let msgs = [];
+  msgs.push(`Потвърдена дължина на линия по шамandurite (Ш1→Ш${BUOY_COUNT}): <b style="color:var(--text-primary)">${nominal.toFixed(1)} м</b> (4 + 23×6 + 4). Тази стойност се използва като целева дължина на линията.`);
+  const mismatches = farmState.lines.filter(l => Math.abs(lineActualLength(l)-nominal) > 0.5);
+  if(mismatches.length){
+    msgs.push(`⚠ ${mismatches.length} линия(и) имат start/end разстояние различно от ${nominal.toFixed(1)} м с повече от 0.5 м — виж Админ режим.`);
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+  text.innerHTML = msgs.join('<br><br>');
+}
+document.getElementById('geo-banner-close').onclick = ()=> document.getElementById('geo-banner').classList.remove('show');
+
+/* ============================================================
+   DETAIL PANEL — BUOY
+============================================================ */
+const detailPanel = document.getElementById('detail-panel');
+function closeDetailPanel(){ detailPanel.classList.remove('open'); }
+document.getElementById('dp-close').onclick = closeDetailPanel;
+
+function showBuoyDetail(line, buoy, heading){
+  document.getElementById('dp-title').textContent = `Шамандура Ш${buoy.index}`;
+  document.getElementById('dp-sub').textContent = `Линия ${line.id} · Група ${line.group}`;
+  document.getElementById('dp-body').innerHTML = `
+    <div class="field"><label>Координати</label><div class="val">${fmtCoord(buoy.pos.lat)}, ${fmtCoord(buoy.pos.lng)}</div></div>
+    <div class="field"><label>Разстояние от началото на линията</label><div class="val">${buoy.cum.toFixed(1)} м</div></div>
+    <div class="field"><label>Курс на линията (heading)</label><div class="val">${heading.toFixed(1)}°</div></div>
+    <div class="field"><label>Линия ID</label><div class="val">Line-${line.id}-Ш${buoy.index}</div></div>
+  `;
+  document.getElementById('dp-foot').innerHTML = '';
+  detailPanel.classList.add('open');
+}
+
+/* ============================================================
+   DETAIL PANEL — SATKA (cage)
+============================================================ */
+function statusBadgeClass(status){
+  if(status==='Изгубена') return 'lost';
+  if(status==='На суша') return 'onland';
+  if(status==='Изведена от употреба') return 'archived';
+  return 'active';
+}
+
+function showSatkaDetail(sat, rec){
+  document.getElementById('dp-title').textContent = sat.id;
+  document.getElementById('dp-sub').textContent = `Линия ${sat.lineId} · Секция ${sat.section} · ${sat.positionLabel}`;
+  document.getElementById('dp-body').innerHTML = `
+    <div class="field"><label>Статус</label>
+      <div style="margin-bottom:6px;"><span class="badge ${statusBadgeClass(rec.status)}" id="dp-status-badge">${rec.status}</span></div>
+      <select id="dp-status">${STATUSES.map(s=>`<option value="${s}" ${s===rec.status?'selected':''}>${s}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Размер</label>
+      <select id="dp-size">${SIZES.map(s=>`<option value="${s}" ${s===rec.size?'selected':''}>${s}</option>`).join('')}</select>
+    </div>
+    <div class="field"><label>Последна обработка</label>
+      <input type="date" id="dp-lastproc" value="${rec.lastProcessed||''}">
+    </div>
+    <div class="field"><label>Бележки</label>
+      <input type="text" id="dp-notes" value="${(rec.notes||'').replace(/"/g,'&quot;')}" placeholder="—">
+    </div>
+    <div class="field"><label>Координати (изчислени от шамандурите)</label><div class="val">${fmtCoord(sat.pos.lat)}, ${fmtCoord(sat.pos.lng)}</div></div>
+  `;
+  document.getElementById('dp-foot').innerHTML = `
+    <button class="btn" id="dp-save">Запази</button>
+    <button class="btn active" id="dp-open">Отвори сатката</button>
+  `;
+  document.getElementById('dp-save').onclick = async ()=>{
+    const newRec = {
+      status: document.getElementById('dp-status').value,
+      size: document.getElementById('dp-size').value,
+      lastProcessed: document.getElementById('dp-lastproc').value || null,
+      notes: document.getElementById('dp-notes').value
+    };
+    await setSatkaRecord(sat.id, newRec);
+    refreshSatkaIcon(sat.id);
+    updateStatChip();
+    showSatkaDetail(sat, newRec);
+  };
+  document.getElementById('dp-open').onclick = ()=> openDossier(sat, rec);
+  detailPanel.classList.add('open');
+}
+
+/* ============================================================
+   MODAL — FULL DOSSIER
+============================================================ */
+const modalOverlay = document.getElementById('modal-overlay');
+document.getElementById('modal-close').onclick = ()=> modalOverlay.classList.remove('show');
+modalOverlay.addEventListener('click', e=>{ if(e.target===modalOverlay) modalOverlay.classList.remove('show'); });
+
+function openDossier(sat, rec){
+  document.getElementById('modal-title').textContent = 'Досие на сатката';
+  document.getElementById('modal-id').textContent = sat.id;
+  document.getElementById('modal-fields').innerHTML = `
+    <div class="field"><label>Линия</label><div class="val">${sat.lineId}</div></div>
+    <div class="field"><label>Секция (между шамandurite)</label><div class="val">${sat.section} (Ш${sat.section} → Ш${sat.section+1})</div></div>
+    <div class="field"><label>Позиция в секцията</label><div class="val">${sat.positionLabel}</div></div>
+    <div class="field"><label>Размер</label><div class="val">${rec.size}</div></div>
+    <div class="field"><label>Статус</label><div class="val">${rec.status}</div></div>
+    <div class="field"><label>Последна обработка</label><div class="val">${rec.lastProcessed || '—'}</div></div>
+    <div class="field"><label>Бележки</label><div class="val">${rec.notes || '—'}</div></div>
+    <div class="field"><label>Координати (изчислени)</label><div class="val">${fmtCoord(sat.pos.lat)}, ${fmtCoord(sat.pos.lng)}</div></div>
+  `;
+  const qrHolder = document.getElementById('qr-holder');
+  qrHolder.innerHTML = '';
+  if(typeof QRCode !== 'undefined'){
+    new QRCode(qrHolder, {text:sat.id, width:120, height:120, colorDark:'#0a1e29', colorLight:'#ffffff'});
+  } else {
+    qrHolder.innerHTML = `<div id="qr-fallback">${sat.id}<br><span style="font-size:9px;">(QR библиотеката не се зареди — показан е само кодът)</span></div>`;
+  }
+  modalOverlay.classList.add('show');
+}
+
+/* ============================================================
+   ADMIN PANEL
+============================================================ */
+const adminPanel = document.getElementById('admin-panel');
+const toggleAdminBtn = document.getElementById('toggle-admin');
+toggleAdminBtn.onclick = ()=>{
+  const willOpen = !adminPanel.classList.contains('open');
+  adminPanel.classList.toggle('open', willOpen);
+  toggleAdminBtn.classList.toggle('active', willOpen);
+  if(willOpen) renderAdminPanel();
+};
+document.getElementById('admin-close').onclick = ()=>{
+  adminPanel.classList.remove('open');
+  toggleAdminBtn.classList.remove('active');
+};
+
+function renderAdminPanel(){
+  const body = document.getElementById('admin-body');
+  const nominal = gapSum(farmState.gapDistances);
+  let html = `<div style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">
+    Изчислена дължина по шамandurite: <b style="color:var(--text-primary)">${nominal.toFixed(1)} м</b>.
+    Редактирайте start/end координати на всяка линия с реални GPS данни, когато са налични. ID-тата на шамandurite и сатките остават непроменени при преместване.
+  </div>`;
+
+  farmState.lines.forEach(line=>{
+    const actual = lineActualLength(line);
+    const mismatch = Math.abs(actual-nominal) > 0.5;
+    html += `
+    <div class="admin-line-card" data-line="${line.id}">
+      <div class="alc-head"><span class="num">Линия ${line.id} · Група ${line.group}</span>
+        <button class="btn small danger" data-remove="${line.id}">Изтрий</button>
+      </div>
+      <div class="row2">
+        <div><span class="mini-label">Start Lat</span><input type="number" step="0.0000001" data-field="startLat" data-line="${line.id}" value="${line.start.lat}"></div>
+        <div><span class="mini-label">Start Lng</span><input type="number" step="0.0000001" data-field="startLng" data-line="${line.id}" value="${line.start.lng}"></div>
+        <div><span class="mini-label">End Lat</span><input type="number" step="0.0000001" data-field="endLat" data-line="${line.id}" value="${line.end.lat}"></div>
+        <div><span class="mini-label">End Lng</span><input type="number" step="0.0000001" data-field="endLng" data-line="${line.id}" value="${line.end.lng}"></div>
+      </div>
+      <div style="margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-muted);">
+        Дължина (start→end): ${actual.toFixed(1)} м · Курс: ${bearingBetween(line.start.lat,line.start.lng,line.end.lat,line.end.lng).toFixed(1)}°
+      </div>
+      ${mismatch ? `<div class="alc-warn">⚠ Разлика спрямо сбора на шамandurite (${nominal.toFixed(1)} м): ${(actual-nominal).toFixed(1)} м</div>` : ''}
+      <button class="btn small" style="margin-top:8px;" data-save="${line.id}">Запази линията</button>
+    </div>`;
+  });
+
+  html += `
+  <details class="gap-editor">
+    <summary>Разстояния между шамandurite (${SECTION_COUNT} стойности, в метри)</summary>
+    <div class="gap-grid" id="gap-grid">
+      ${farmState.gapDistances.map((g,i)=>`<input type="number" step="0.1" data-gap="${i}" value="${g}" title="Ш${i+1}→Ш${i+2}">`).join('')}
+    </div>
+    <button class="btn small" id="gap-save" style="margin-top:8px;">Запази разстоянията</button>
+    <div id="geom-check-result"></div>
+  </details>`;
+
+  body.innerHTML = html;
+
+  body.querySelectorAll('[data-save]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = Number(btn.getAttribute('data-save'));
+      const card = body.querySelector(`.admin-line-card[data-line="${id}"]`);
+      const get = f => Number(card.querySelector(`[data-field="${f}"]`).value);
+      const line = farmState.lines.find(l=>l.id===id);
+      line.start = {lat:get('startLat'), lng:get('startLng')};
+      line.end = {lat:get('endLat'), lng:get('endLng')};
+      await saveState();
+      renderAll();
+      renderAdminPanel();
+    };
+  });
+  body.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = Number(btn.getAttribute('data-remove'));
+      if(!confirm(`Да изтрия ли Линия ${id}? Записаните данни за сатките на тази линия ще останат в паметта, но няма да се показват.`)) return;
+      farmState.lines = farmState.lines.filter(l=>l.id!==id);
+      await saveState();
+      renderAll();
+      renderAdminPanel();
+    };
+  });
+  const gapSaveBtn = document.getElementById('gap-save');
+  if(gapSaveBtn){
+    gapSaveBtn.onclick = async ()=>{
+      const inputs = body.querySelectorAll('[data-gap]');
+      const newGaps = new Array(SECTION_COUNT);
+      inputs.forEach(inp=>{ newGaps[Number(inp.getAttribute('data-gap'))] = Number(inp.value); });
+      farmState.gapDistances = newGaps;
+      await saveState();
+      renderAll();
+      runGeometryCheck();
+    };
+  }
+  runGeometryCheck();
+}
+
+function runGeometryCheck(){
+  const el = document.getElementById('geom-check-result');
+  if(!el) return;
+  const nominal = gapSum(farmState.gapDistances);
+  let lines = [`Сбор на разстоянията между шамandurite: <b>${nominal.toFixed(2)} м</b> — това е потвърдената целева дължина на линията.`];
+  farmState.lines.forEach(l=>{
+    const actual = lineActualLength(l);
+    const d = actual-nominal;
+    const flag = Math.abs(d)>0.5 ? ' ⚠' : ' ✓';
+    lines.push(`Линия ${l.id}: start→end = ${actual.toFixed(2)} м${flag}`);
+  });
+  el.innerHTML = lines.join('<br>');
+}
+
+document.getElementById('admin-add-line').onclick = async ()=>{
+  const maxId = farmState.lines.reduce((m,l)=>Math.max(m,l.id),0);
+  const newId = maxId+1;
+  const nominal = gapSum(farmState.gapDistances);
+  const heading = 0; // matches the coast-parallel default; edit start/end after adding for real data
+  const perp = 90;
+  // place it further out to sea from the farm center, offset by how many lines already exist,
+  // purely as a rough starting point — reposition via the start/end fields above
+  const countSoFar = farmState.lines.length;
+  const base = destPoint(farmState.center.lat, farmState.center.lng, perp, 60 + countSoFar*18);
+  const start = destPoint(base.lat, base.lng, heading, -nominal/2);
+  const end = destPoint(base.lat, base.lng, heading, nominal/2);
+  farmState.lines.push({id:newId, group: newId<=3?'A':'B', start, end});
+  await saveState();
+  renderAll();
+  renderAdminPanel();
+};
+
+document.getElementById('admin-reset').onclick = async ()=>{
+  if(!confirm('Да нулирам ли всички данни (линии, шамandurite, сатки) до примерните стойности по подразбиране? Това не може да бъде отменено.')) return;
+  farmState = {
+    center: FARM_CENTER,
+    lines: generateDefaultLines(FARM_CENTER),
+    gapDistances: GAP_DISTANCES_DEFAULT.slice(),
+    satki: {}
+  };
+  await saveState();
+  renderAll();
+  renderAdminPanel();
+};
+
+/* ============================================================
+   BASE LAYER TOGGLE
+============================================================ */
+const seamarkBtn = document.getElementById('toggle-seamark');
+seamarkBtn.onclick = ()=>{
+  if(map.hasLayer(seamarkLayer)){ map.removeLayer(seamarkLayer); seamarkBtn.classList.remove('active'); }
+  else{ map.addLayer(seamarkLayer); seamarkBtn.classList.add('active'); }
+};
+
+/* ============================================================
+   BOOT
+============================================================ */
+(async function boot(){
+  document.getElementById('stat-chip').textContent = 'зареждане на данни…';
+  await loadState();
+  document.getElementById('center-coords').textContent = `${fmtCoord(farmState.center.lat)}, ${fmtCoord(farmState.center.lng)}`;
+  renderAll();
+})();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# Nightly encrypted database backup, kept as a workflow artifact for 90 days.
+# The dump is encrypted because artifacts of a public repository can be
+# downloaded by other GitHub users.
+# Needs two repository SECRETS:
+#   SUPABASE_DB_URL     Supabase → Project Settings → Database → Connection string (URI, session pooler)
+#   BACKUP_PASSPHRASE   a long passphrase; store it in a password manager — without it the backup cannot be opened
+# Restore steps: docs/BACKUP.md
+name: Backup
+
+on:
+  schedule:
+    - cron: '30 2 * * *' # 02:30 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    if: ${{ vars.BACKUP_ENABLED == 'true' }}
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Dump schema and data
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f schema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f data.sql --data-only --use-copy
+          tar czf backup.tar.gz schema.sql data.sql
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+              --symmetric --cipher-algo AES256 -o backup-$(date -u +%F).tar.gz.gpg backup.tar.gz
+          rm backup.tar.gz schema.sql data.sql
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-backup
+          path: backup-*.tar.gz.gpg
+          retention-days: 90

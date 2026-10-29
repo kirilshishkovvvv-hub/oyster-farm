@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Ферма за стриди</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f3;
+  --surface:#ffffff;
+  --surface-2:#eef1ee;
+  --border:#d7ddd6;
+  --text:#16211f;
+  --text-muted:#5b6b66;
+  --primary:#0f6e8c;
+  --primary-dark:#0a4f64;
+  --danger:#c0271e;
+  --danger-bg:#fdeceb;
+  --warn:#a15c00;
+  --warn-bg:#fdf1de;
+  --good:#157a3d;
+  --good-bg:#e9f7ee;
+  --archived:#5b6472;
+  --archived-bg:#eceef1;
+  --size-spat:#7c3aed;
+  --size-small:#2563eb;
+  --size-large:#f97316;
+  --size-xl:#dc2626;
+  --size-commercial:#eab308;
+  --radius:14px;
+  --radius-lg:20px;
+  --shadow:0 4px 18px rgba(20,40,35,.10);
+  --shadow-lg:0 10px 32px rgba(20,40,35,.16);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:'Inter',system-ui,sans-serif; -webkit-tap-highlight-color:transparent;}
+#app{position:relative; max-width:520px; margin:0 auto; min-height:100vh; background:var(--bg); overflow-x:hidden;}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif; margin:0;}
+.screen{display:none; min-height:100vh; padding-bottom:24px;}
+.screen.active{display:block;}
+
+/* -------- top app bar (screens other than home) -------- */
+.appbar{
+  position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:10px;
+  background:var(--surface); border-bottom:1px solid var(--border); padding:14px 16px;
+}
+.appbar h2{font-size:19px; flex:1;}
+.back-btn{
+  width:44px; height:44px; border-radius:50%; border:1px solid var(--border); background:var(--surface-2);
+  font-size:20px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; color:var(--text);
+}
+.back-btn:active{background:var(--border);}
+
+/* -------- big buttons -------- */
+.big-btn{
+  display:flex; align-items:center; gap:14px; width:100%;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:18px 18px; font-size:19px; font-weight:600; color:var(--text);
+  box-shadow:var(--shadow); cursor:pointer; text-align:left; margin-bottom:14px; min-height:64px;
+  font-family:'Inter',sans-serif;
+}
+.big-btn:active{transform:scale(.98); background:var(--surface-2);}
+.big-btn .ic{font-size:26px; flex:none; width:34px; text-align:center;}
+.big-btn.primary{background:var(--primary); color:#fff; border-color:var(--primary);}
+.big-btn.primary:active{background:var(--primary-dark);}
+.big-btn.danger{background:var(--danger-bg); color:var(--danger); border-color:#f4c9c6;}
+.big-btn.ghost{box-shadow:none; background:transparent;}
+.big-btn.small{min-height:52px; font-size:16px; padding:12px 16px;}
+
+button.plain-btn{
+  font-family:'Inter',sans-serif; font-weight:600; font-size:15px; color:var(--primary);
+  background:none; border:none; padding:10px; cursor:pointer;
+}
+
+/* -------- home -------- */
+#screen-home{padding:0;}
+.home-hero{
+  background:linear-gradient(180deg,var(--primary) 0%, var(--primary-dark) 100%); color:#fff;
+  padding:34px 20px 26px; border-radius:0 0 28px 28px; margin-bottom:22px;
+}
+.home-hero h1{font-size:26px; margin-bottom:4px;}
+.home-hero .sub{font-size:14px; opacity:.85;}
+.home-body{padding:0 18px;}
+
+/* -------- form fields -------- */
+.field{margin-bottom:18px;}
+.field label{display:block; font-size:14px; font-weight:600; color:var(--text-muted); margin-bottom:6px;}
+.field input[type="text"], .field input[type="number"], .field input[type="date"], .field select{
+  width:100%; font-size:18px; padding:14px 14px; border-radius:12px; border:1.5px solid var(--border);
+  background:var(--surface); color:var(--text); font-family:'JetBrains Mono',monospace;
+}
+.field input[type="text"].big-input{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700; text-align:center; letter-spacing:1px;}
+.field textarea{width:100%; font-size:16px; padding:12px; border-radius:12px; border:1.5px solid var(--border); font-family:inherit; min-height:70px;}
+
+/* -------- cards -------- */
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:18px; margin:16px; box-shadow:var(--shadow);}
+.card + .card{margin-top:0;}
+.info-row{display:flex; justify-content:space-between; align-items:baseline; padding:9px 0; border-bottom:1px solid var(--surface-2); font-size:16px;}
+.info-row:last-child{border-bottom:none;}
+.info-row .k{color:var(--text-muted); font-weight:500;}
+.info-row .v{font-weight:700; text-align:right;}
+
+.badge{display:inline-block; padding:5px 14px; border-radius:20px; font-weight:700; font-size:14px;}
+.badge.status-Активна{background:var(--good-bg); color:var(--good);}
+.badge.status-На-суша{background:var(--warn-bg); color:var(--warn);}
+.badge.status-Изгубена{background:var(--danger-bg); color:var(--danger);}
+.badge.status-Изведена-от-употреба{background:var(--archived-bg); color:var(--archived);}
+.badge.status-Повредена{background:#fde8dc; color:#b3450c;}
+
+.size-chip{display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:15px; padding:5px 12px 5px 8px; border-radius:20px; color:#fff;}
+.size-chip .dot{width:12px; height:12px; border-radius:50%; background:#fff; opacity:.9;}
+
+/* -------- grids of buttons (operations, sizes) -------- */
+.grid-btns{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 16px 16px;}
+.grid-btns .gbtn{
+  background:var(--surface); border:1.5px solid var(--border); border-radius:14px; padding:16px 10px;
+  font-size:15px; font-weight:700; text-align:center; cursor:pointer; min-height:64px;
+  display:flex; align-items:center; justify-content:center; color:var(--text);
+}
+.grid-btns .gbtn:active{background:var(--surface-2);}
+.grid-btns.sizes .gbtn{color:#fff; border:none;}
+
+/* -------- search -------- */
+.search-box{padding:18px 16px 6px;}
+.search-result-empty{padding:30px 20px; text-align:center; color:var(--text-muted); font-size:16px;}
+
+/* -------- qr scanner -------- */
+#qr-reader{width:100%; border-radius:var(--radius-lg); overflow:hidden; margin:0 16px 16px; background:#000; min-height:260px;}
+.scan-hint{text-align:center; color:var(--text-muted); font-size:14px; padding:0 20px 10px;}
+
+/* -------- history list -------- */
+.hist-item{padding:14px 16px; border-bottom:1px solid var(--surface-2);}
+.hist-item .hd{display:flex; justify-content:space-between; font-weight:700; font-size:15px;}
+.hist-item .hd .op{color:var(--primary);}
+.hist-item .meta{font-size:13.5px; color:var(--text-muted); margin-top:3px; line-height:1.5;}
+
+/* -------- confirm sheet -------- */
+#confirm-overlay{position:fixed; inset:0; background:rgba(10,20,18,.45); z-index:900; display:none; align-items:flex-end; justify-content:center;}
+#confirm-overlay.show{display:flex;}
+.sheet{width:100%; max-width:520px; background:var(--surface); border-radius:24px 24px 0 0; padding:22px 18px 26px; box-shadow:var(--shadow-lg);}
+.sheet h3{font-size:19px; margin-bottom:8px;}
+.sheet p{font-size:15px; color:var(--text-muted); margin:0 0 18px;}
+.sheet .row-btns{display:flex; gap:10px;}
+.sheet .row-btns .big-btn{margin-bottom:0;}
+
+/* -------- toast -------- */
+#toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#16211f; color:#fff;
+  padding:12px 20px; border-radius:12px; font-size:15px; font-weight:600; z-index:1000; opacity:0; pointer-events:none; transition:opacity .2s;}
+#toast.show{opacity:1;}
+
+/* -------- map screen -------- */
+#screen-map{padding:0;}
+#map-wrap{position:relative; height:100vh;}
+#map{position:absolute; inset:0;}
+.map-topbar{position:absolute; top:0; left:0; right:0; z-index:400; display:flex; align-items:center; gap:8px; padding:12px; pointer-events:none;}
+.map-topbar > *{pointer-events:auto;}
+.map-topbar .back-btn{background:var(--surface); box-shadow:var(--shadow);}
+.map-title-pill{background:var(--surface); box-shadow:var(--shadow); border-radius:20px; padding:9px 16px; font-weight:700; font-size:14px; flex:1;}
+.map-icon-btn{width:44px; height:44px; border-radius:50%; background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow); font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.compass-control{background:var(--surface); border:1px solid var(--border); border-radius:50%; width:50px; height:50px; box-shadow:var(--shadow); position:relative;}
+.compass-rose{position:relative; width:100%; height:100%;}
+.compass-rose span{position:absolute; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; color:var(--text);}
+.compass-rose .n{top:3px; left:50%; transform:translateX(-50%); color:var(--danger);}
+.compass-rose .s{bottom:3px; left:50%; transform:translateX(-50%);}
+.compass-rose .e{right:4px; top:50%; transform:translateY(-50%);}
+.compass-rose .w{left:4px; top:50%; transform:translateY(-50%);}
+.compass-rose .dot{position:absolute; top:50%; left:50%; width:5px; height:5px; margin:-2.5px; border-radius:50%; background:var(--primary);}
+.map-no-gps-banner{
+  position:absolute; top:70px; left:12px; right:12px; z-index:400; background:var(--surface); border:1px solid var(--warn);
+  border-radius:14px; padding:12px 14px; box-shadow:var(--shadow); font-size:13.5px; color:var(--text-muted);
+}
+.map-no-gps-banner b{color:var(--warn); display:block; margin-bottom:3px;}
+.map-settings-popover{
+  position:absolute; top:64px; right:12px; z-index:401; background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:12px 14px; box-shadow:var(--shadow-lg); font-size:14px; display:none; min-width:190px;
+}
+.map-settings-popover.show{display:block;}
+.map-settings-popover label{display:flex; align-items:center; gap:8px; font-weight:600;}
+.legend-toggle-btn{position:absolute; bottom:16px; left:12px; z-index:400;}
+#legend-panel{
+  position:absolute; bottom:16px; left:12px; z-index:400; background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:12px 14px; box-shadow:var(--shadow-lg); font-size:12.5px; width:200px; display:none;
+}
+#legend-panel.show{display:block;}
+#legend-panel .lg-title{font-weight:700; margin-bottom:6px;}
+#legend-panel .row{display:flex; align-items:center; gap:7px; margin:3px 0;}
+#legend-panel .sw{width:11px; height:11px; border-radius:3px; flex:none;}
+#legend-panel hr{border:none; border-top:1px solid var(--surface-2); margin:7px 0;}
+
+.anchor-icon{font-size:14px; color:var(--primary-dark); filter:drop-shadow(0 0 2px #fff);}
+.line-label{background:var(--surface); border:1px solid var(--border); color:var(--text); font-family:'Space Grotesk',sans-serif;
+  font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; white-space:nowrap; box-shadow:var(--shadow);}
+.buoy-dot{width:19px; height:19px; border-radius:50%; background:#fff; border:2.5px solid var(--primary);
+  color:var(--primary-dark); font-family:'JetBrains Mono',monospace; font-size:7.5px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; box-shadow:0 0 4px rgba(0,0,0,.3);}
+.satka-shape{width:15px; height:15px; border:1.5px solid rgba(0,0,0,.35); box-shadow:0 0 3px rgba(0,0,0,.4);
+  display:flex; align-items:center; justify-content:center; font-size:9px; color:#fff; font-weight:800; border-radius:4px;}
+.sat-lost .satka-shape{border-radius:50%; background:var(--danger) !important;}
+.sat-onland .satka-shape{clip-path:polygon(50% 0%,0% 100%,100% 100%); background:var(--warn) !important; border:none;}
+.sat-archived .satka-shape{opacity:.45; filter:grayscale(.5); border-style:dashed;}
+.sat-damaged .satka-shape{border:2px solid #b3450c;}
+.sat-empty .satka-shape{background:#fff !important; border:1.5px dashed var(--border); box-shadow:none;}
+
+/* -------- settings/admin -------- */
+.settings-section{padding:16px;}
+.settings-section h3{font-size:15px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-muted); margin:22px 0 10px;}
+.line-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px;}
+.line-card .lc-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; font-weight:700;}
+.gps-missing-tag{background:var(--warn-bg); color:var(--warn); font-size:12px; font-weight:700; padding:3px 9px; border-radius:12px;}
+.gps-set-tag{background:var(--good-bg); color:var(--good); font-size:12px; font-weight:700; padding:3px 9px; border-radius:12px;}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.mini-label{font-size:11px; color:var(--text-muted); margin-bottom:3px; display:block; font-weight:600;}
+.dev-zone{border:2px dashed var(--danger); border-radius:14px; padding:14px; margin-top:8px;}
+.dev-zone p{font-size:13px; color:var(--text-muted);}
+
+.qr-holder-box{background:#fff; padding:14px; border-radius:12px; display:inline-block; box-shadow:var(--shadow); border:1px solid var(--border);}
+
+@media (min-width:540px){ #app{border-left:1px solid var(--border); border-right:1px solid var(--border);} }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= HOME ================= -->
+  <div class="screen active" id="screen-home">
+    <div class="home-hero">
+      <h1>🦪 Ферма за стриди</h1>
+      <div class="sub" id="home-sub">—</div>
+    </div>
+    <div class="home-body">
+      <button class="big-btn primary" data-nav="search"><span class="ic">🔎</span> Намери сатка</button>
+      <button class="big-btn primary" data-nav="scan"><span class="ic">📷</span> Сканирай QR код</button>
+      <button class="big-btn" data-nav="add-satka"><span class="ic">➕</span> Добави сатка</button>
+      <button class="big-btn" data-nav="map"><span class="ic">🗺</span> Карта на фермата</button>
+      <button class="big-btn" data-nav="recent"><span class="ic">📋</span> Последни операции</button>
+      <button class="big-btn ghost" data-nav="settings"><span class="ic">⚙</span> Настройки</button>
+    </div>
+  </div>
+
+  <!-- ================= SEARCH ================= -->
+  <div class="screen" id="screen-search">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2>Намери сатка</h2></div>
+    <div class="search-box">
+      <div class="field">
+        <input type="text" class="big-input" id="search-input" placeholder="SAT-00001" autocomplete="off">
+      </div>
+      <button class="big-btn primary" id="search-go-btn"><span class="ic">🔎</span> Намери</button>
+    </div>
+    <div id="search-result"></div>
+  </div>
+
+  <!-- ================= QR SCAN ================= -->
+  <div class="screen" id="screen-scan">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2>Сканирай QR код</h2></div>
+    <div id="qr-reader"></div>
+    <div class="scan-hint" id="scan-hint">Насочи камерата към QR кода на сатката.</div>
+    <div style="padding:0 16px;">
+      <button class="big-btn" id="manual-entry-btn"><span class="ic">⌨️</span> Въведи номера ръчно</button>
+    </div>
+    <div id="scan-manual-box" style="display:none; padding:0 16px;">
+      <div class="field"><input type="text" class="big-input" id="scan-manual-input" placeholder="SAT-00001"></div>
+      <button class="big-btn primary" id="scan-manual-go">Отвори сатката</button>
+    </div>
+  </div>
+
+  <!-- ================= DOSSIER ================= -->
+  <div class="screen" id="screen-dossier">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2 id="dossier-title">SAT-00000</h2></div>
+    <div class="card" id="dossier-card"></div>
+    <div style="padding:0 16px;">
+      <button class="big-btn primary" data-nav="add-operation"><span class="ic">➕</span> Добави операция</button>
+      <button class="big-btn" id="dossier-map-btn"><span class="ic">🗺</span> Покажи на картата</button>
+      <button class="big-btn" data-nav="history"><span class="ic">🕘</span> История</button>
+      <button class="big-btn ghost" id="dossier-qr-btn"><span class="ic">🔳</span> Покажи QR код</button>
+      <button class="big-btn ghost ret-active-btn" id="dossier-return-btn" style="display:none;"><span class="ic">↩️</span> Върни в активни</button>
+    </div>
+    <div id="dossier-qr-box" style="display:none; text-align:center; padding:10px 16px 20px;"></div>
+  </div>
+
+  <!-- ================= ADD OPERATION ================= -->
+  <div class="screen" id="screen-add-operation">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2>Добави операция</h2></div>
+    <div style="padding:10px 16px; color:var(--text-muted); font-size:15px;" id="add-op-target">Сатка: —</div>
+    <div class="grid-btns" id="op-grid"></div>
+  </div>
+
+  <!-- ================= OP: pick size (used for Сортирана / creation) ================= -->
+  <div class="screen" id="screen-pick-size">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2 id="pick-size-title">Избери размер</h2></div>
+    <div class="grid-btns sizes" id="size-grid"></div>
+  </div>
+
+  <!-- ================= OP: pick position ================= -->
+  <div class="screen" id="screen-pick-position">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2 id="pick-pos-title">Избери позиция</h2></div>
+    <div style="padding:16px;">
+      <div class="field">
+        <label>Линия</label>
+        <select id="pos-line-select"></select>
+      </div>
+      <div class="card" id="pos-suggestion-card" style="margin:0 0 16px;"></div>
+      <button class="plain-btn" id="pos-manual-toggle">Избери друга позиция →</button>
+      <div id="pos-manual-box" style="display:none; margin-top:14px;">
+        <div class="field">
+          <label>Секция (1–25)</label>
+          <input type="number" id="pos-manual-section" min="1" max="25" value="1">
+        </div>
+        <div class="field">
+          <label>Позиция в секцията</label>
+          <select id="pos-manual-corner"></select>
+        </div>
+        <button class="big-btn primary" id="pos-manual-confirm">Използвай тази позиция</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= OP: note (Друга) ================= -->
+  <div class="screen" id="screen-op-note">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2>Бележка</h2></div>
+    <div style="padding:16px;">
+      <div class="field"><textarea id="op-note-text" placeholder="Опиши какво е направено…"></textarea></div>
+      <button class="big-btn primary" id="op-note-confirm">Запази</button>
+    </div>
+  </div>
+
+  <!-- ================= HISTORY ================= -->
+  <div class="screen" id="screen-history">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2 id="history-title">История</h2></div>
+    <div id="history-list"></div>
+  </div>
+
+  <!-- ================= ADD SATKA ================= -->
+  <div class="screen" id="screen-add-satka">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2>Добави сатка</h2></div>
+    <div style="padding:16px;">
+      <div class="field">
+        <label>Стъпка 1 · Линия</label>
+        <select id="as-line-select"></select>
+      </div>
+      <div class="card" id="as-suggestion-card"></div>
+      <button class="plain-btn" id="as-manual-toggle">Избери друга позиция →</button>
+      <div id="as-manual-box" style="display:none; margin-top:12px;">
+        <div class="field"><label>Секция (1–25)</label><input type="number" id="as-manual-section" min="1" max="25" value="1"></div>
+        <div class="field"><label>Позиция в секцията</label><select id="as-manual-corner"></select></div>
+      </div>
+    </div>
+    <div style="padding:0 16px;"><h3 style="font-size:14px; color:var(--text-muted); margin-bottom:10px;">Стъпка 2 · Размер</h3></div>
+    <div class="grid-btns sizes" id="as-size-grid"></div>
+  </div>
+
+  <!-- ================= RECENT OPS ================= -->
+  <div class="screen" id="screen-recent">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2>Последни операции</h2></div>
+    <div id="recent-list"></div>
+  </div>
+
+  <!-- ================= MAP ================= -->
+  <div class="screen" id="screen-map">
+    <div id="map-wrap">
+      <div id="map"></div>
+      <div class="map-topbar">
+        <button class="back-btn" data-back>←</button>
+        <div class="map-title-pill" id="map-title-pill">Ферма</div>
+        <div class="map-icon-btn" id="map-settings-icon">⚙</div>
+        <div class="compass-control"><div class="compass-rose"><span class="n">N</span><span class="s">S</span><span class="e">E</span><span class="w">W</span><div class="dot"></div></div></div>
+      </div>
+      <div class="map-settings-popover" id="map-settings-popover">
+        <label><input type="checkbox" id="seamark-toggle"> 🌊 Морски знаци (OpenSeaMap)</label>
+      </div>
+      <div class="map-no-gps-banner" id="map-no-gps-banner" style="display:none;">
+        <b>Няма въведени GPS координати</b>
+        <span>Линиите все още нямат реални координати. Отиди в Настройки → Линии, за да ги въведеш.</span>
+      </div>
+      <button class="map-icon-btn legend-toggle-btn" id="legend-toggle-btn">ℹ️</button>
+      <div id="legend-panel">
+        <div class="lg-title">Легенда</div>
+        <div class="row"><div class="sw" style="background:var(--size-spat)"></div>Спат</div>
+        <div class="row"><div class="sw" style="background:var(--size-small)"></div>Малки</div>
+        <div class="row"><div class="sw" style="background:var(--size-large)"></div>Големи</div>
+        <div class="row"><div class="sw" style="background:var(--size-xl)"></div>Едри</div>
+        <div class="row"><div class="sw" style="background:var(--size-commercial)"></div>Търговски размер</div>
+        <hr>
+        <div class="row"><div class="sw" style="background:var(--danger); border-radius:50%;"></div>Изгубена</div>
+        <div class="row"><div class="sw" style="background:var(--warn);"></div>На суша</div>
+        <div class="row"><div class="sw" style="background:#fff; border:1.5px dashed var(--border);"></div>Свободна позиция</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SETTINGS ================= -->
+  <div class="screen" id="screen-settings">
+    <div class="appbar"><button class="back-btn" data-back>←</button><h2>Настройки</h2></div>
+    <div class="settings-section">
+      <h3>Система</h3>
+      <div class="card" id="settings-stats"></div>
+
+      <h3>Оператор</h3>
+      <div class="card">
+        <div class="field" style="margin:0;">
+          <label>Твоето име (по избор, за историята)</label>
+          <input type="text" id="operator-name-input" placeholder="напр. Иван">
+        </div>
+      </div>
+
+      <h3>Линии — GPS координати</h3>
+      <div id="settings-lines"></div>
+
+      <h3>Разстояния между шамandurite</h3>
+      <div class="card">
+        <div style="font-size:13.5px; color:var(--text-muted); margin-bottom:10px;">
+          Номинална дължина на въжето: <b>150 м</b>. Изчислена дължина по шамandurite (Ш1→Ш26): <b id="settings-gap-sum">—</b> м. Тези две стойности умишлено НЕ се сливат автоматично.
+        </div>
+        <details>
+          <summary style="cursor:pointer; color:var(--primary); font-weight:600;">Редактирай 25-те разстояния (м)</summary>
+          <div id="gap-grid" style="display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px;"></div>
+          <button class="big-btn small primary" id="gap-save-btn" style="margin-top:12px;">Запази разстоянията</button>
+        </details>
+      </div>
+
+      <h3>Developer</h3>
+      <div class="card dev-zone">
+        <p>Опасни действия за разработка — не за ежедневна употреба.</p>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px;">
+          <input type="checkbox" id="dev-mode-toggle"> Включи developer режим
+        </label>
+        <div id="dev-actions" style="display:none; margin-top:12px;">
+          <button class="big-btn danger small" id="dev-reset-btn">Нулирай ВСИЧКИ данни (необратимо)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-overlay">
+    <div class="sheet">
+      <h3 id="confirm-title">Потвърди</h3>
+      <p id="confirm-text"></p>
+      <div class="row-btns">
+        <button class="big-btn ghost" id="confirm-cancel" style="flex:1;">Отказ</button>
+        <button class="big-btn primary" id="confirm-ok" style="flex:1;">Потвърди</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onerror="window.__qrGenMissing=true"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" onerror="window.__qrScanMissing=true"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   1. CONSTANTS
+============================================================ */
+const R_EARTH = 6371000;
+const toRad = d => d*Math.PI/180;
+const toDeg = r => r*180/Math.PI;
+function destPoint(lat,lng,bearingDeg,distM){
+  const delta = distM/R_EARTH, theta = toRad(bearingDeg);
+  const phi1 = toRad(lat), lam1 = toRad(lng);
+  const phi2 = Math.asin(Math.sin(phi1)*Math.cos(delta) + Math.cos(phi1)*Math.sin(delta)*Math.cos(theta));
+  const lam2 = lam1 + Math.atan2(Math.sin(theta)*Math.sin(delta)*Math.cos(phi1), Math.cos(delta)-Math.sin(phi1)*Math.sin(phi2));
+  return {lat:toDeg(phi2), lng:toDeg(lam2)};
+}
+function haversine(lat1,lng1,lat2,lng2){
+  const phi1=toRad(lat1), phi2=toRad(lat2), dphi=toRad(lat2-lat1), dlam=toRad(lng2-lng1);
+  const a = Math.sin(dphi/2)**2 + Math.cos(phi1)*Math.cos(phi2)*Math.sin(dlam/2)**2;
+  return 2*R_EARTH*Math.asin(Math.sqrt(a));
+}
+function bearingBetween(lat1,lng1,lat2,lng2){
+  const phi1=toRad(lat1), phi2=toRad(lat2), dlam=toRad(lng2-lng1);
+  const y=Math.sin(dlam)*Math.cos(phi2);
+  const x=Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(dlam);
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+
+const FARM_CENTER = {lat:43.3253309, lng:28.0747198}; // reference point only — NOT the lines' GPS
+const GAP_DISTANCES_DEFAULT = [4, ...Array(23).fill(6), 4]; // 25 gaps, 26 buoys
+const BUOY_COUNT = 26;
+const SECTION_COUNT = BUOY_COUNT - 1; // 25
+const NOMINAL_ROPE_LENGTH_M = 150; // stated nominal length — kept separate, never auto-merged with the buoy-derived figure
+const POSITION_DEFS = [
+  {code:'GL', label:'Горна лява',  perpSign:-1, alongFrac:0.25},
+  {code:'DL', label:'Долна лява',  perpSign:-1, alongFrac:0.75},
+  {code:'GD', label:'Горна дясна', perpSign: 1, alongFrac:0.25},
+  {code:'DD', label:'Долна дясна', perpSign: 1, alongFrac:0.75},
+];
+const CAGE_PERP_OFFSET = 1.3;
+
+const SIZES = ['Спат','Малки','Големи','Едри','Търговски размер'];
+const SIZE_COLORS = {
+  'Спат':'#7c3aed','Малки':'#2563eb','Големи':'#f97316','Едри':'#dc2626','Търговски размер':'#eab308'
+};
+const SIZE_TEXT_ON_COLOR = { 'Търговски размер':'#1a1a1a' }; // yellow needs dark text for contrast
+
+const STATUSES = ['Активна','На суша','Изгубена','Изведена от употреба','Повредена'];
+const STATUS_CLASS = s => 'status-'+s.replace(/\s+/g,'-');
+
+const OP_BUTTONS = [
+  'Сортирана','На суша','Поставена във вода','Преместена','Почистена','Сменена мрежа',
+  'Брана / извадена за реколта','Проверена','Повредена','Изгубена','Изведена от употреба','Друга'
+];
+const OP_CREATE = 'Нова / сортирана';
+// operations that free the active position (satka no longer occupies a slot)
+const OPS_FREE_POSITION = new Set(['На суша','Изгубена','Изведена от употреба']);
+// operations that require picking a (new) position
+const OPS_NEED_POSITION = new Set(['Поставена във вода','Преместена']);
+// operations that require picking a size
+const OPS_NEED_SIZE = new Set(['Сортирана']);
+// operations that require a free-text note
+const OPS_NEED_NOTE = new Set(['Друга']);
+// operations that just set status = op name (simple 1:1 status ops)
+const OPS_SET_STATUS = new Set(['На суша','Изгубена','Изведена от употреба','Повредена']);
+
+/* ============================================================
+   2. STATE + PERSISTENCE
+============================================================ */
+const STORAGE_KEY = 'oyster-farm-state-v2';
+const USER_KEY = 'oyster-farm-operator-name';
+let state = null;
+let operatorName = '';
+let storageOK = true;
+
+function defaultState(){
+  const lines = [];
+  for(let i=1;i<=6;i++){
+    lines.push({
+      id:i, group: i<=3?'A':'B', number:i,
+      startLat:null, startLng:null, endLat:null, endLng:null // real GPS not provided yet — left unset intentionally
+    });
+  }
+  return {
+    schemaVersion:2,
+    meta:{ nextSatkaSeq:1 },
+    farm:{ id:1, name:'Ферма за стриди', centerLat:FARM_CENTER.lat, centerLng:FARM_CENTER.lng },
+    lines,
+    gapDistancesM: GAP_DISTANCES_DEFAULT.slice(),
+    occupancy:{},   // "lineId:section:corner" -> satkaId
+    satki:{},       // satkaId -> record
+    history:{},     // satkaId -> [entries]
+    operationsLog:[]// flat feed, newest first, capped
+  };
+}
+
+async function loadState(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if(res && res.value){ state = JSON.parse(res.value); }
+  }catch(e){ /* not found yet */ }
+  if(!state){ state = defaultState(); await saveState(); }
+  if(!state.lines || state.lines.length!==6){ state.lines = defaultState().lines; }
+  if(!state.gapDistancesM || state.gapDistancesM.length!==SECTION_COUNT){ state.gapDistancesM = GAP_DISTANCES_DEFAULT.slice(); }
+  if(!state.occupancy) state.occupancy = {};
+  if(!state.satki) state.satki = {};
+  if(!state.history) state.history = {};
+  if(!state.operationsLog) state.operationsLog = [];
+  if(!state.meta) state.meta = {nextSatkaSeq:1};
+
+  try{
+    const r = await window.storage.get(USER_KEY, false);
+    if(r && r.value) operatorName = r.value;
+  }catch(e){ /* none set */ }
+}
+async function saveState(){
+  try{
+    const r = await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+    if(!r) throw new Error('null');
+    storageOK = true;
+  }catch(e){ storageOK = false; showToast('⚠ Промяната не може да се запази в момента.'); }
+}
+async function saveOperatorName(){
+  try{ await window.storage.set(USER_KEY, operatorName, false); }catch(e){ /* best effort */ }
+}
+
+/* ============================================================
+   3. DERIVED GEOMETRY / POSITIONS
+============================================================ */
+function lineHasGps(line){ return line.startLat!=null && line.startLng!=null && line.endLat!=null && line.endLng!=null; }
+function gapSumM(){ return state.gapDistancesM.reduce((a,b)=>a+b,0); }
+
+function computeBuoys(line){
+  if(!lineHasGps(line)) return {buoys:[], heading:null};
+  const heading = bearingBetween(line.startLat,line.startLng,line.endLat,line.endLng);
+  const buoys = [{index:1, lat:line.startLat, lng:line.startLng, cum:0}];
+  let cum=0;
+  for(let g=0; g<state.gapDistancesM.length; g++){
+    cum += state.gapDistancesM[g];
+    const p = destPoint(line.startLat,line.startLng,heading,cum);
+    buoys.push({index:g+2, lat:p.lat, lng:p.lng, cum});
+  }
+  return {buoys, heading};
+}
+function positionLatLng(line, section, cornerCode){
+  const {buoys, heading} = computeBuoys(line);
+  if(!buoys.length) return null;
+  const def = POSITION_DEFS.find(p=>p.code===cornerCode);
+  const bA = buoys[section-1], bB = buoys[section];
+  if(!bA||!bB) return null;
+  const perp = (heading+90)%360;
+  const gapLen = bB.cum - bA.cum;
+  const alongDist = bA.cum + gapLen*def.alongFrac;
+  const centerPt = destPoint(line.startLat, line.startLng, heading, alongDist);
+  return destPoint(centerPt.lat, centerPt.lng, perp, def.perpSign*CAGE_PERP_OFFSET);
+}
+function occKey(pos){ return `${pos.lineId}:${pos.section}:${pos.corner}`; }
+function isPositionFree(lineId, section, corner){ return !state.occupancy[`${lineId}:${section}:${corner}`]; }
+function firstFreePosition(lineId){
+  for(let s=1;s<=SECTION_COUNT;s++){
+    for(const def of POSITION_DEFS){
+      if(isPositionFree(lineId,s,def.code)) return {lineId, section:s, corner:def.code};
+    }
+  }
+  return null;
+}
+function formatPosition(pos){
+  if(!pos) return '—';
+  const line = state.lines.find(l=>l.id===pos.lineId);
+  const cornerLabel = (POSITION_DEFS.find(p=>p.code===pos.corner)||{}).label || pos.corner;
+  return `Линия ${line?line.number:pos.lineId} / Секция ${pos.section} / ${cornerLabel}`;
+}
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDateBg(iso){
+  if(!iso) return '—';
+  const [y,m,d] = iso.split('-'); return `${d}.${m}.${y}`;
+}
+
+/* ============================================================
+   4. SATKA CRUD
+============================================================ */
+function nextSatkaId(){
+  const n = state.meta.nextSatkaSeq;
+  state.meta.nextSatkaSeq = n+1;
+  return 'SAT-' + String(n).padStart(5,'0');
+}
+function pushHistory(satkaId, entry){
+  if(!state.history[satkaId]) state.history[satkaId]=[];
+  state.history[satkaId].push(entry);
+}
+function pushOpLog(satkaId, op, summary){
+  state.operationsLog.unshift({date:todayISO(), satkaId, op, summary, ts:Date.now()});
+  if(state.operationsLog.length>500) state.operationsLog.length = 500;
+}
+async function createSatka(size, pos){
+  const id = nextSatkaId();
+  const now = todayISO();
+  state.satki[id] = {
+    id, size, status:'Активна', position:{...pos}, lastKnownPosition:{...pos},
+    lastProcessed: now, lastOperation: OP_CREATE, createdAt: now
+  };
+  state.occupancy[occKey(pos)] = id;
+  pushHistory(id, {date:now, op:OP_CREATE, toSize:size, toPosition:{...pos}, note:'', by:operatorName});
+  pushOpLog(id, OP_CREATE, `Размер: ${size} · ${formatPosition(pos)}`);
+  await saveState();
+  return id;
+}
+function assignPosition(satkaId, pos){
+  const sk = state.satki[satkaId];
+  state.occupancy[occKey(pos)] = satkaId;
+  sk.position = {...pos};
+  sk.lastKnownPosition = {...pos};
+}
+function freeCurrentPosition(satkaId){
+  const sk = state.satki[satkaId];
+  if(sk.position){
+    const key = occKey(sk.position);
+    if(state.occupancy[key]===satkaId) delete state.occupancy[key];
+    sk.lastKnownPosition = {...sk.position};
+    sk.position = null;
+  }
+}
+async function applyOperation(satkaId, op, extra){
+  const sk = state.satki[satkaId];
+  if(!sk) return;
+  const now = todayISO();
+  const entry = {date:now, op, note:extra&&extra.note||'', by:operatorName};
+
+  if(OPS_NEED_SIZE.has(op) && extra && extra.size){
+    entry.fromSize = sk.size; entry.toSize = extra.size; sk.size = extra.size;
+  }
+  if(OPS_NEED_POSITION.has(op) && extra && extra.position){
+    entry.fromPosition = sk.position ? {...sk.position} : (sk.lastKnownPosition?{...sk.lastKnownPosition}:null);
+    if(sk.position){ const oldKey=occKey(sk.position); if(state.occupancy[oldKey]===satkaId) delete state.occupancy[oldKey]; }
+    assignPosition(satkaId, extra.position);
+    entry.toPosition = {...extra.position};
+    sk.status = 'Активна';
+  }
+  if(OPS_FREE_POSITION.has(op)){
+    entry.fromPosition = sk.position ? {...sk.position} : null;
+    freeCurrentPosition(satkaId);
+    sk.status = op;
+  } else if(OPS_SET_STATUS.has(op) && !OPS_FREE_POSITION.has(op)){
+    // 'Повредена' — status changes but position is intentionally NOT freed (assumption — flagged to user)
+    sk.status = op;
+  }
+
+  sk.lastProcessed = now;
+  sk.lastOperation = op;
+  pushHistory(satkaId, entry);
+  let summary = extra&&extra.note ? extra.note : '';
+  if(entry.toSize) summary = `${entry.fromSize||'?'} → ${entry.toSize}`;
+  if(entry.toPosition) summary = formatPosition(entry.toPosition);
+  pushOpLog(satkaId, op, summary);
+  await saveState();
+}
+async function returnToActive(satkaId, pos){
+  await applyOperation(satkaId, 'Поставена във вода', {position:pos});
+}
+
+/* ============================================================
+   5. NAVIGATION
+============================================================ */
+let navStack = ['home'];
+let ctx = {}; // scratch context for cross-screen flows
+
+function showScreen(name, push){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el = document.getElementById('screen-'+name);
+  if(el) el.classList.add('active');
+  if(push!==false){ navStack.push(name); }
+  window.scrollTo(0,0);
+  if(name==='map') setTimeout(()=>{ if(map){ map.invalidateSize(); } }, 50);
+}
+function goBack(){
+  stopScanner(); // safe no-op if the camera isn't running — always clean up when leaving any screen
+  if(navStack.length>1){ navStack.pop(); }
+  const target = navStack[navStack.length-1] || 'home';
+  showScreen(target, false);
+  onScreenShown(target);
+}
+document.querySelectorAll('[data-back]').forEach(b=> b.onclick = goBack);
+document.querySelectorAll('[data-nav]').forEach(b=>{
+  b.onclick = ()=>{ const t=b.getAttribute('data-nav'); showScreen(t); onScreenShown(t); };
+});
+
+function onScreenShown(name){
+  if(name==='home') renderHome();
+  if(name==='recent') renderRecent();
+  if(name==='settings') renderSettings();
+  if(name==='add-satka') renderAddSatka();
+  if(name==='map') { renderMapScreen(); }
+}
+
+/* ============================================================
+   6. TOAST + CONFIRM SHEET
+============================================================ */
+let toastTimer=null;
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+function confirmAction(title, text, onOk){
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent = text;
+  const overlay = document.getElementById('confirm-overlay');
+  overlay.classList.add('show');
+  const okBtn = document.getElementById('confirm-ok');
+  const cancelBtn = document.getElementById('confirm-cancel');
+  const cleanup = ()=>{ overlay.classList.remove('show'); okBtn.onclick=null; cancelBtn.onclick=null; };
+  okBtn.onclick = ()=>{ cleanup(); onOk(); };
+  cancelBtn.onclick = cleanup;
+}
+
+/* ============================================================
+   7. HOME
+============================================================ */
+function renderHome(){
+  const total = Object.keys(state.satki).length;
+  const active = Object.values(state.satki).filter(s=>s.status==='Активна').length;
+  document.getElementById('home-sub').textContent = `${active} активни сатки от общо ${total}`;
+}
+
+/* ============================================================
+   8. SEARCH
+============================================================ */
+document.getElementById('search-go-btn').onclick = doSearch;
+document.getElementById('search-input').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+function doSearch(){
+  const raw = document.getElementById('search-input').value.trim().toUpperCase();
+  const id = raw.startsWith('SAT-') ? raw : (raw ? 'SAT-'+raw.padStart(5,'0') : '');
+  const box = document.getElementById('search-result');
+  const sk = state.satki[id];
+  if(!sk){ box.innerHTML = `<div class="search-result-empty">Не е намерена сатка с този номер.</div>`; return; }
+  box.innerHTML = renderSatkaSummaryCard(sk) + `<div style="padding:0 16px;"><button class="big-btn primary" id="search-open-dossier">Отвори досието</button></div>`;
+  document.getElementById('search-open-dossier').onclick = ()=> openDossier(id);
+}
+function renderSatkaSummaryCard(sk){
+  return `<div class="card">
+    <div class="info-row"><span class="k">ID</span><span class="v">${sk.id}</span></div>
+    <div class="info-row"><span class="k">Статус</span><span class="v"><span class="badge ${STATUS_CLASS(sk.status)}">${sk.status}</span></span></div>
+    <div class="info-row"><span class="k">Размер</span><span class="v">${sizeChip(sk.size)}</span></div>
+    <div class="info-row"><span class="k">Местоположение</span><span class="v">${sk.position?formatPosition(sk.position):'—'}</span></div>
+    <div class="info-row"><span class="k">Последна обработка</span><span class="v">${fmtDateBg(sk.lastProcessed)}</span></div>
+    <div class="info-row"><span class="k">Последна операция</span><span class="v">${sk.lastOperation||'—'}</span></div>
+  </div>`;
+}
+function sizeChip(size){
+  const c = SIZE_COLORS[size]||'#888';
+  const tc = SIZE_TEXT_ON_COLOR[size]||'#fff';
+  return `<span class="size-chip" style="background:${c}; color:${tc};"><span class="dot"></span>${size}</span>`;
+}
+
+/* ============================================================
+   9. QR SCANNER
+============================================================ */
+let html5QrCode = null, scannerRunning=false;
+document.getElementById('manual-entry-btn').onclick = ()=>{
+  document.getElementById('scan-manual-box').style.display='block';
+  stopScanner();
+};
+document.getElementById('scan-manual-go').onclick = ()=>{
+  const raw = document.getElementById('scan-manual-input').value.trim().toUpperCase();
+  const id = raw.startsWith('SAT-') ? raw : (raw ? 'SAT-'+raw.padStart(5,'0') : '');
+  if(state.satki[id]) openDossier(id); else showToast('Не е намерена сатка с този номер.');
+};
+function startScanner(){
+  const hint = document.getElementById('scan-hint');
+  if(typeof Html5Qrcode === 'undefined'){
+    hint.textContent = 'Камерата не е достъпна в момента — въведи номера ръчно.';
+    return;
+  }
+  html5QrCode = new Html5Qrcode('qr-reader');
+  Html5Qrcode.getCameras().then(cams=>{
+    if(!cams || !cams.length){ hint.textContent='Няма открита камера — въведи номера ръчно.'; return; }
+    html5QrCode.start(cams[0].id, {fps:10, qrbox:220}, decodedText=>{
+      const id = decodedText.trim().toUpperCase();
+      stopScanner();
+      if(state.satki[id]) openDossier(id);
+      else showToast('QR кодът не отговаря на позната сатка.');
+    }, ()=>{}).then(()=>{ scannerRunning=true; }).catch(()=>{ hint.textContent='Камерата отказа достъп — въведи номера ръчно.'; });
+  }).catch(()=>{ hint.textContent='Камерата не е достъпна — въведи номера ръчно.'; });
+}
+function stopScanner(){
+  if(html5QrCode && scannerRunning){ html5QrCode.stop().catch(()=>{}); scannerRunning=false; }
+}
+
+/* ============================================================
+   10. DOSSIER
+============================================================ */
+function openDossier(satkaId){
+  ctx.currentSatkaId = satkaId;
+  showScreen('dossier');
+  renderDossier(satkaId);
+}
+function renderDossier(satkaId){
+  const sk = state.satki[satkaId];
+  document.getElementById('dossier-title').textContent = satkaId;
+  document.getElementById('dossier-card').innerHTML = `
+    <div class="info-row"><span class="k">Статус</span><span class="v"><span class="badge ${STATUS_CLASS(sk.status)}">${sk.status}</span></span></div>
+    <div class="info-row"><span class="k">Размер</span><span class="v">${sizeChip(sk.size)}</span></div>
+    <div class="info-row"><span class="k">Местоположение</span><span class="v">${sk.position?formatPosition(sk.position):(sk.lastKnownPosition?'— (последно: '+formatPosition(sk.lastKnownPosition)+')':'—')}</span></div>
+    <div class="info-row"><span class="k">Последна обработка</span><span class="v">${fmtDateBg(sk.lastProcessed)}</span></div>
+    <div class="info-row"><span class="k">Последна операция</span><span class="v">${sk.lastOperation||'—'}</span></div>
+  `;
+  const returnBtn = document.getElementById('dossier-return-btn');
+  returnBtn.style.display = (sk.status!=='Активна') ? 'flex' : 'none';
+  document.getElementById('dossier-qr-box').style.display='none';
+  document.getElementById('dossier-map-btn').onclick = ()=>{
+    const pos = sk.position || sk.lastKnownPosition;
+    if(!pos){ showToast('Няма записано местоположение.'); return; }
+    const line = state.lines.find(l=>l.id===pos.lineId);
+    if(!line || !lineHasGps(line)){ showToast('GPS координатите на тази линия все още не са въведени.'); return; }
+    showScreen('map'); renderMapScreen(); focusMapOnPosition(pos);
+  };
+  document.getElementById('dossier-qr-btn').onclick = ()=> toggleDossierQr(satkaId);
+  returnBtn.onclick = ()=>{
+    ctx.opFlow = {satkaId, op:'Поставена във вода'};
+    document.getElementById('pick-pos-title').textContent = 'Избери позиция';
+    showScreen('pick-position'); setupPickPositionScreen(sk.lastKnownPosition);
+  };
+}
+function toggleDossierQr(satkaId){
+  const box = document.getElementById('dossier-qr-box');
+  if(box.style.display==='block'){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML = '';
+  const holder = document.createElement('div'); holder.className='qr-holder-box'; box.appendChild(holder);
+  if(typeof QRCode !== 'undefined'){
+    new QRCode(holder, {text:satkaId, width:150, height:150, colorDark:'#16211f', colorLight:'#ffffff'});
+  } else {
+    holder.innerHTML = `<div style="font-family:'JetBrains Mono',monospace; font-weight:700; padding:30px 10px;">${satkaId}<br><span style="font-size:11px; font-weight:400;">(QR библиотеката не се зареди)</span></div>`;
+  }
+}
+
+/* ============================================================
+   11. ADD OPERATION FLOW
+============================================================ */
+function renderOpGrid(){
+  document.getElementById('op-grid').innerHTML = OP_BUTTONS.map(op=>`<div class="gbtn" data-op="${op}">${op}</div>`).join('');
+  document.querySelectorAll('#op-grid .gbtn').forEach(b=>{
+    b.onclick = ()=> startOperation(ctx.currentSatkaId, b.getAttribute('data-op'));
+  });
+}
+function startOperation(satkaId, op){
+  document.getElementById('add-op-target').textContent = `Сатка: ${satkaId}`;
+  if(OPS_NEED_SIZE.has(op)){
+    ctx.opFlow = {satkaId, op};
+    document.getElementById('pick-size-title').textContent = 'Нов размер';
+    showScreen('pick-size'); setupPickSizeScreen();
+    return;
+  }
+  if(OPS_NEED_POSITION.has(op)){
+    ctx.opFlow = {satkaId, op};
+    document.getElementById('pick-pos-title').textContent = 'Нова позиция';
+    showScreen('pick-position'); setupPickPositionScreen(state.satki[satkaId].lastKnownPosition);
+    return;
+  }
+  if(OPS_NEED_NOTE.has(op)){
+    ctx.opFlow = {satkaId, op};
+    document.getElementById('op-note-text').value='';
+    showScreen('op-note');
+    return;
+  }
+  // simple confirm-only ops
+  confirmAction(op, `Да отбележа "${op}" за ${satkaId}?`, async ()=>{
+    await applyOperation(satkaId, op, {});
+    showToast('Записано.');
+    openDossier(satkaId);
+  });
+}
+document.getElementById('op-note-confirm').onclick = ()=>{
+  const note = document.getElementById('op-note-text').value.trim();
+  const {satkaId, op} = ctx.opFlow;
+  confirmAction(op, `Да запиша операция "${op}" за ${satkaId}?`, async ()=>{
+    await applyOperation(satkaId, op, {note});
+    showToast('Записано.');
+    openDossier(satkaId);
+  });
+};
+function setupPickSizeScreen(){
+  const grid = document.getElementById('size-grid');
+  grid.innerHTML = SIZES.map(s=>`<div class="gbtn" data-size="${s}" style="background:${SIZE_COLORS[s]}; color:${SIZE_TEXT_ON_COLOR[s]||'#fff'};">${s}</div>`).join('');
+  document.querySelectorAll('#size-grid .gbtn').forEach(b=>{
+    b.onclick = ()=>{
+      const size = b.getAttribute('data-size');
+      const {satkaId, op} = ctx.opFlow;
+      confirmAction('Смяна на размер', `${size} за ${satkaId}. Потвърждаваш ли?`, async ()=>{
+        await applyOperation(satkaId, op, {size});
+        showToast('Записано.');
+        openDossier(satkaId);
+      });
+    };
+  });
+}
+function setupPickPositionScreen(suggestedFallback){
+  const lineSel = document.getElementById('pos-line-select');
+  lineSel.innerHTML = state.lines.map(l=>`<option value="${l.id}">Линия ${l.number} (Група ${l.group})</option>`).join('');
+  if(suggestedFallback) lineSel.value = suggestedFallback.lineId;
+  document.getElementById('pos-manual-box').style.display='none';
+  document.getElementById('pos-manual-toggle').textContent = 'Избери друга позиция →';
+  renderPosSuggestion();
+  lineSel.onchange = renderPosSuggestion;
+  document.getElementById('pos-manual-toggle').onclick = ()=>{
+    const box = document.getElementById('pos-manual-box');
+    const show = box.style.display==='none';
+    box.style.display = show?'block':'none';
+    populateCornerSelect('pos-manual-corner');
+  };
+  document.getElementById('pos-manual-confirm').onclick = ()=>{
+    const lineId = Number(lineSel.value);
+    const section = Number(document.getElementById('pos-manual-section').value);
+    const corner = document.getElementById('pos-manual-corner').value;
+    if(section<1||section>SECTION_COUNT){ showToast('Секцията трябва да е между 1 и 25.'); return; }
+    if(!isPositionFree(lineId,section,corner)){ showToast('Тази позиция вече е заета.'); return; }
+    finishPositionPick({lineId, section, corner});
+  };
+}
+function renderPosSuggestion(){
+  const lineId = Number(document.getElementById('pos-line-select').value);
+  const free = firstFreePosition(lineId);
+  const card = document.getElementById('pos-suggestion-card');
+  if(!free){ card.innerHTML = `<div class="info-row"><span class="k">Свободна позиция</span><span class="v">няма свободни</span></div>`; return; }
+  card.innerHTML = `
+    <div class="info-row"><span class="k">Предложена позиция</span><span class="v">${formatPosition(free)}</span></div>
+    <button class="big-btn primary" id="pos-use-suggested" style="margin-top:12px; margin-bottom:0;">Използвай тази позиция</button>`;
+  document.getElementById('pos-use-suggested').onclick = ()=> finishPositionPick(free);
+}
+function populateCornerSelect(id){
+  document.getElementById(id).innerHTML = POSITION_DEFS.map(p=>`<option value="${p.code}">${p.label}</option>`).join('');
+}
+function finishPositionPick(pos){
+  const {satkaId, op} = ctx.opFlow;
+  confirmAction(op, `${formatPosition(pos)} за ${satkaId}. Потвърждаваш ли?`, async ()=>{
+    await applyOperation(satkaId, op, {position:pos});
+    showToast('Записано.');
+    openDossier(satkaId);
+  });
+}
+
+/* ============================================================
+   12. HISTORY
+============================================================ */
+function renderHistoryScreen(satkaId){
+  document.getElementById('history-title').textContent = `История · ${satkaId}`;
+  const items = (state.history[satkaId]||[]).slice().reverse();
+  const list = document.getElementById('history-list');
+  if(!items.length){ list.innerHTML = `<div class="search-result-empty">Няма записана история.</div>`; return; }
+  list.innerHTML = items.map(h=>{
+    let meta = [];
+    if(h.toSize) meta.push(`Размер: ${h.fromSize||'?'} → ${h.toSize}`);
+    if(h.toPosition) meta.push(`${h.fromPosition?formatPosition(h.fromPosition)+' → ':''}${formatPosition(h.toPosition)}`);
+    if(h.note) meta.push(h.note);
+    if(h.by) meta.push('от '+h.by);
+    return `<div class="hist-item"><div class="hd"><span class="op">${h.op}</span><span>${fmtDateBg(h.date)}</span></div>
+      ${meta.length?`<div class="meta">${meta.join(' · ')}</div>`:''}</div>`;
+  }).join('');
+}
+// override nav for history to pass current satka
+document.querySelector('#screen-dossier [data-nav="history"]').onclick = ()=>{
+  showScreen('history'); renderHistoryScreen(ctx.currentSatkaId);
+};
+
+/* ============================================================
+   13. ADD SATKA
+============================================================ */
+function renderAddSatka(){
+  ctx.newSatkaPos = null;
+  const lineSel = document.getElementById('as-line-select');
+  lineSel.innerHTML = state.lines.map(l=>`<option value="${l.id}">Линия ${l.number} (Група ${l.group})</option>`).join('');
+  document.getElementById('as-manual-box').style.display='none';
+  renderAsSuggestion();
+  lineSel.onchange = renderAsSuggestion;
+  document.getElementById('as-manual-toggle').onclick = ()=>{
+    const box = document.getElementById('as-manual-box');
+    box.style.display = box.style.display==='none'?'block':'none';
+    populateCornerSelect('as-manual-corner');
+  };
+  const grid = document.getElementById('as-size-grid');
+  grid.innerHTML = SIZES.map(s=>`<div class="gbtn" data-size="${s}" style="background:${SIZE_COLORS[s]}; color:${SIZE_TEXT_ON_COLOR[s]||'#fff'};">${s}</div>`).join('');
+  document.querySelectorAll('#as-size-grid .gbtn').forEach(b=>{
+    b.onclick = async ()=>{
+      const size = b.getAttribute('data-size');
+      let pos = ctx.newSatkaPos;
+      const manualVisible = document.getElementById('as-manual-box').style.display==='block';
+      if(manualVisible){
+        const lineId = Number(lineSel.value);
+        const section = Number(document.getElementById('as-manual-section').value);
+        const corner = document.getElementById('as-manual-corner').value;
+        if(section<1||section>SECTION_COUNT){ showToast('Секцията трябва да е между 1 и 25.'); return; }
+        if(!isPositionFree(lineId,section,corner)){ showToast('Тази позиция вече е заета.'); return; }
+        pos = {lineId, section, corner};
+      }
+      if(!pos){ showToast('Няма избрана позиция.'); return; }
+      confirmAction('Нова сатка', `${size} · ${formatPosition(pos)}. Създавам нова сатка?`, async ()=>{
+        const id = await createSatka(size, pos);
+        showToast(`Създадена ${id}`);
+        openDossier(id);
+      });
+    };
+  });
+}
+function renderAsSuggestion(){
+  const lineId = Number(document.getElementById('as-line-select').value);
+  const free = firstFreePosition(lineId);
+  const card = document.getElementById('as-suggestion-card');
+  if(!free){ card.innerHTML = `<div class="info-row"><span class="k">Свободна позиция</span><span class="v">няма свободни</span></div>`; ctx.newSatkaPos=null; return; }
+  card.innerHTML = `<div class="info-row"><span class="k">Предложена позиция</span><span class="v">${formatPosition(free)}</span></div>`;
+  ctx.newSatkaPos = free;
+}
+
+/* ============================================================
+   14. RECENT OPERATIONS
+============================================================ */
+function renderRecent(){
+  const list = document.getElementById('recent-list');
+  const items = state.operationsLog.slice(0,100);
+  if(!items.length){ list.innerHTML = `<div class="search-result-empty">Все още няма записани операции.</div>`; return; }
+  list.innerHTML = items.map(o=>`<div class="hist-item" data-open="${o.satkaId}">
+    <div class="hd"><span class="op">${o.op}</span><span>${fmtDateBg(o.date)}</span></div>
+    <div class="meta">${o.satkaId}${o.summary?' · '+o.summary:''}</div></div>`).join('');
+  list.querySelectorAll('[data-open]').forEach(el=>{ el.onclick = ()=> openDossier(el.getAttribute('data-open')); el.style.cursor='pointer'; });
+}
+
+/* ============================================================
+   15. MAP
+============================================================ */
+let map=null, osmLayer=null, seamarkLayer=null, linesLayer=null, buoysLayer=null, satkiLayer=null;
+let satkaMarkerIndex={};
+
+function initMapIfNeeded(){
+  if(map) return;
+  map = L.map('map', {zoomControl:true, maxZoom:22, minZoom:5}).setView([FARM_CENTER.lat, FARM_CENTER.lng], 16);
+  map.zoomControl.setPosition('bottomright');
+  osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:22, maxNativeZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+  seamarkLayer = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {maxZoom:22, maxNativeZoom:18, attribution:'&copy; OpenSeaMap'});
+  linesLayer = L.layerGroup().addTo(map);
+  buoysLayer = L.layerGroup();
+  satkiLayer = L.layerGroup();
+  map.on('zoomend', updateLayerVisibility);
+
+  document.getElementById('map-settings-icon').onclick = ()=>{
+    document.getElementById('map-settings-popover').classList.toggle('show');
+  };
+  document.getElementById('seamark-toggle').onchange = e=>{
+    if(e.target.checked) map.addLayer(seamarkLayer); else map.removeLayer(seamarkLayer);
+  };
+  document.getElementById('legend-toggle-btn').onclick = ()=>{
+    document.getElementById('legend-panel').classList.toggle('show');
+  };
+}
+function renderMapScreen(){
+  initMapIfNeeded();
+  renderMapLines();
+  renderMapBuoysAndSatki();
+  updateLayerVisibility();
+  const anyGps = state.lines.some(lineHasGps);
+  document.getElementById('map-no-gps-banner').style.display = anyGps ? 'none' : 'block';
+  document.getElementById('map-title-pill').textContent = 'Ферма за стриди';
+  setTimeout(()=> map.invalidateSize(), 60);
+}
+function renderMapLines(){
+  linesLayer.clearLayers();
+  const pts = [];
+  state.lines.forEach(line=>{
+    if(!lineHasGps(line)) return;
+    const ll = [[line.startLat,line.startLng],[line.endLat,line.endLng]];
+    pts.push(ll[0], ll[1]);
+    L.polyline(ll,{color:'#0a4f64', weight:7, opacity:.35, lineCap:'round'}).addTo(linesLayer);
+    L.polyline(ll,{color:'#0f6e8c', weight:3, dashArray:'2 7', opacity:.95, lineCap:'round'}).addTo(linesLayer);
+    const anchorIcon = L.divIcon({className:'', html:'<div class="anchor-icon">⚓</div>', iconSize:[16,16], iconAnchor:[8,8]});
+    L.marker(ll[0],{icon:anchorIcon, interactive:false}).addTo(linesLayer);
+    L.marker(ll[1],{icon:anchorIcon, interactive:false}).addTo(linesLayer);
+    const midLat=(line.startLat+line.endLat)/2, midLng=(line.startLng+line.endLng)/2;
+    const label = L.divIcon({className:'', html:`<div class="line-label">Линия ${line.number} · Група ${line.group}</div>`, iconSize:null});
+    const lm = L.marker([midLat,midLng], {icon:label}).addTo(linesLayer);
+    lm.on('click', ()=> showToast(`Линия ${line.number} · Група ${line.group} · дължина по шамandurite: ${gapSumM().toFixed(1)} м`));
+  });
+  if(pts.length) map.fitBounds(L.latLngBounds(pts), {padding:[60,110]});
+  else map.setView([FARM_CENTER.lat, FARM_CENTER.lng], 15);
+}
+function satkaIconFor(sk){
+  let cls='', extra='', bg = sk?SIZE_COLORS[sk.size]:'#fff';
+  if(!sk){ cls='sat-empty'; }
+  else if(sk.status==='Изгубена'){ cls='sat-lost'; extra='✕'; }
+  else if(sk.status==='На суша'){ cls='sat-onland'; }
+  else if(sk.status==='Изведена от употреба'){ cls='sat-archived'; }
+  else if(sk.status==='Повредена'){ cls='sat-damaged'; extra='!'; }
+  return L.divIcon({className:'satka-icon '+cls, html:`<div class="satka-shape" style="background:${bg}">${extra}</div>`, iconSize:[15,15], iconAnchor:[7,7]});
+}
+function renderMapBuoysAndSatki(){
+  buoysLayer.clearLayers(); satkiLayer.clearLayers(); satkaMarkerIndex={};
+  state.lines.forEach(line=>{
+    if(!lineHasGps(line)) return;
+    const {buoys, heading} = computeBuoys(line);
+    buoys.forEach(b=>{
+      const icon = L.divIcon({className:'', html:`<div class="buoy-dot">Ш${b.index}</div>`, iconSize:[19,19], iconAnchor:[9,9]});
+      const m = L.marker([b.lat,b.lng],{icon}).addTo(buoysLayer);
+      m.on('click', ()=> showToast(`Шамандура Ш${b.index} · Линия ${line.number} · секции ${Math.max(1,b.index-1)}–${Math.min(SECTION_COUNT,b.index)}`));
+    });
+    for(let s=1;s<=SECTION_COUNT;s++){
+      POSITION_DEFS.forEach(def=>{
+        const pt = positionLatLng(line, s, def.code);
+        if(!pt) return;
+        const satkaId = state.occupancy[`${line.id}:${s}:${def.code}`];
+        const sk = satkaId ? state.satki[satkaId] : null;
+        const icon = satkaIconFor(sk);
+        const mk = L.marker([pt.lat,pt.lng], {icon}).addTo(satkiLayer);
+        mk.on('click', ()=>{ if(sk) openDossierFromMap(sk.id); else showToast(`Свободна позиция: Линия ${line.number} / Секция ${s} / ${def.label}`); });
+        if(sk) satkaMarkerIndex[sk.id]=mk;
+      });
+    }
+  });
+}
+function openDossierFromMap(id){ showScreen('dossier'); ctx.currentSatkaId=id; renderDossier(id); }
+function updateLayerVisibility(){
+  if(!map) return;
+  const z = map.getZoom();
+  if(z>=18){ if(!map.hasLayer(buoysLayer)) map.addLayer(buoysLayer); } else if(map.hasLayer(buoysLayer)) map.removeLayer(buoysLayer);
+  if(z>=20){ if(!map.hasLayer(satkiLayer)) map.addLayer(satkiLayer); } else if(map.hasLayer(satkiLayer)) map.removeLayer(satkiLayer);
+}
+function focusMapOnPosition(pos){
+  const line = state.lines.find(l=>l.id===pos.lineId);
+  const pt = positionLatLng(line, pos.section, pos.corner);
+  if(!pt) return;
+  map.setView([pt.lat, pt.lng], 21);
+}
+
+/* ============================================================
+   16. SETTINGS / ADMIN
+============================================================ */
+function renderSettings(){
+  document.getElementById('operator-name-input').value = operatorName;
+  document.getElementById('operator-name-input').onchange = e=>{ operatorName = e.target.value.trim(); saveOperatorName(); };
+
+  const total = Object.keys(state.satki).length;
+  const active = Object.values(state.satki).filter(s=>s.status==='Активна').length;
+  const lost = Object.values(state.satki).filter(s=>s.status==='Изгубена').length;
+  const onland = Object.values(state.satki).filter(s=>s.status==='На суша').length;
+  const archived = Object.values(state.satki).filter(s=>s.status==='Изведена от употреба').length;
+  const damaged = Object.values(state.satki).filter(s=>s.status==='Повредена').length;
+  document.getElementById('settings-stats').innerHTML = `
+    <div class="info-row"><span class="k">Общо сатки</span><span class="v">${total}</span></div>
+    <div class="info-row"><span class="k">Активни</span><span class="v">${active}</span></div>
+    <div class="info-row"><span class="k">Изгубени</span><span class="v">${lost}</span></div>
+    <div class="info-row"><span class="k">На суша</span><span class="v">${onland}</span></div>
+    <div class="info-row"><span class="k">Изведени от употреба</span><span class="v">${archived}</span></div>
+    <div class="info-row"><span class="k">Повредени</span><span class="v">${damaged}</span></div>
+    <div class="info-row"><span class="k">Общо теоретични позиции</span><span class="v">${6*SECTION_COUNT*4}</span></div>
+    <div class="info-row"><span class="k">Заети позиции</span><span class="v">${Object.keys(state.occupancy).length}</span></div>
+  `;
+
+  document.getElementById('settings-gap-sum').textContent = gapSumM().toFixed(1);
+
+  const linesBox = document.getElementById('settings-lines');
+  linesBox.innerHTML = state.lines.map(l=>`
+    <div class="line-card" data-line="${l.id}">
+      <div class="lc-head"><span>Линия ${l.number} · Група ${l.group}</span>
+        ${lineHasGps(l)?'<span class="gps-set-tag">GPS въведена</span>':'<span class="gps-missing-tag">GPS липсва</span>'}</div>
+      <div class="row2">
+        <div><span class="mini-label">Start Lat</span><input type="number" step="0.0000001" data-f="startLat" value="${l.startLat??''}" placeholder="—"></div>
+        <div><span class="mini-label">Start Lng</span><input type="number" step="0.0000001" data-f="startLng" value="${l.startLng??''}" placeholder="—"></div>
+        <div><span class="mini-label">End Lat</span><input type="number" step="0.0000001" data-f="endLat" value="${l.endLat??''}" placeholder="—"></div>
+        <div><span class="mini-label">End Lng</span><input type="number" step="0.0000001" data-f="endLng" value="${l.endLng??''}" placeholder="—"></div>
+      </div>
+      <button class="big-btn small primary" data-save="${l.id}" style="margin-top:10px; margin-bottom:0;">Запази GPS</button>
+    </div>
+  `).join('');
+  linesBox.querySelectorAll('[data-save]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = Number(btn.getAttribute('data-save'));
+      const card = linesBox.querySelector(`.line-card[data-line="${id}"]`);
+      const get = f=>{ const v = card.querySelector(`[data-f="${f}"]`).value; return v===''?null:Number(v); };
+      const line = state.lines.find(l=>l.id===id);
+      line.startLat=get('startLat'); line.startLng=get('startLng'); line.endLat=get('endLat'); line.endLng=get('endLng');
+      await saveState();
+      showToast('GPS запазена.');
+      renderSettings();
+    };
+  });
+
+  const gapGrid = document.getElementById('gap-grid');
+  gapGrid.innerHTML = state.gapDistancesM.map((g,i)=>`<input type="number" step="0.1" data-gap="${i}" value="${g}" title="Ш${i+1}→Ш${i+2}" style="padding:6px; font-size:12px; text-align:center;">`).join('');
+  document.getElementById('gap-save-btn').onclick = async ()=>{
+    const vals = new Array(SECTION_COUNT);
+    gapGrid.querySelectorAll('[data-gap]').forEach(inp=> vals[Number(inp.getAttribute('data-gap'))] = Number(inp.value));
+    state.gapDistancesM = vals;
+    await saveState();
+    showToast('Разстоянията са запазени.');
+    renderSettings();
+  };
+
+  const devToggle = document.getElementById('dev-mode-toggle');
+  devToggle.checked=false;
+  document.getElementById('dev-actions').style.display='none';
+  devToggle.onchange = e=>{ document.getElementById('dev-actions').style.display = e.target.checked?'block':'none'; };
+  document.getElementById('dev-reset-btn').onclick = ()=>{
+    confirmAction('Нулиране на ВСИЧКИ данни', 'Това ще изтрие всички сатки, история и GPS данни необратимо. Само за режим на разработка.', async ()=>{
+      state = defaultState();
+      await saveState();
+      showToast('Данните са нулирани.');
+      renderSettings();
+    });
+  };
+}
+
+/* ============================================================
+   17. BOOT
+============================================================ */
+(async function boot(){
+  await loadState();
+  renderHome();
+  const scanNav = document.querySelector('[data-nav="scan"]');
+  scanNav.addEventListener('click', ()=> setTimeout(startScanner, 150));
+  renderOpGrid();
+})();
+
+})();
+</script>
+</body>
+</html>
